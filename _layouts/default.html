@@ -1,25 +1,21 @@
-<!DOCTYPE html>
+{% include header.html %}
 
-<!--
-  portfolYOU Jekyll theme by Youssef Raafat
-  Free for personal and commercial use under the MIT license
-  https://github.com/YoussefRaafatNasry/portfolYOU
--->
+    {% include title-group.html %}
 
-<html lang="en" class="h-100">
+    <main>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12">
 
-{% include head.html %}
+                    {% for post in paginator.posts %}
+                      {% include tile.html %}
+                    {% endfor %}
 
-<body class="d-flex flex-column h-100">
+                    {% include pagination.html %}
 
-  <main class="flex-shrink-0 container mt-5">
-  {% include navbar.html %}
-  {{ content }}
-  </main>
+                </div>
+            </div>
+        </div>
+    </main>
 
-  {% include footer.html %}
-  {% include scripts.html %}
-
-</body>
-
-</html>
+{% include footer.html %}

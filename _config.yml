@@ -1,54 +1,43 @@
-# Site settings
-title: Marshtupa Bogdan
-description: >- # this means to ignore newlines until "baseurl:"
-  Always code as if the guy who ends up maintaining your code
-  will be a violent psychopath who knows where you live.
-baseurl: ""  # the subpath of your site, e.g. /blog
-url: "" # the base hostname & protocol for your site, e.g. http://example.com
-repository: lmaron-g
+# Welcome to Jekyll!
+#
+# This config file is meant for settings that affect your whole blog, values
+# which you are expected to set up once and rarely edit after that. If you find
+# yourself editing this file very often, consider using Jekyll's data files
+# feature for the data you need to update frequently.
+#
+# For technical reasons, this file is *NOT* reloaded automatically when you use
+# 'bundle exec jekyll serve'. If you change this file, please restart the server process.
 
+# Site settings
+# These are used to personalize your new site. If you look in the HTML files,
+# you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
+# You can create any custom variable you would like, and they will be accessible
+# in the templates via {{ site.myvariable }}.
+title: "Hello."
+email: 'marshtupa18@gmail.com'
+description: "Hello, I'm Marshtupa Bogdan. I'm a student of school 21 and MTUCI."
+baseurl: "" # the subpath of your site, e.g. /blog
+url: "http://lmaron-g.github.io" # the base hostname & protocol for your site, e.g. http://example.com
+instagram_username: 'marshtupabogdan'
+vk_username: 'b.marshtupa'
+github_username: 'lmaron-g'
 
 # Build settings
 markdown: kramdown
-# plugins:
-# - jekyll-feed
+# theme: phantom # Uncomment once published to RubyGems
+plugins:
+  - jekyll-paginate
 
+### Phantom settings
+paginate: 10
+footer_text: '© 2019 Marshtupa Bogdan'
+admin_name: 'Marshtupa Bogdan'
+google_analytics: "UA-9999999-99" # Update with your own tracking ID
+enable_contact: true
 
-# Author Info
-author:
-  name     : John Doe
-  image    : https://i2.cdn.turner.com/cnnnext/dam/assets/140926165711-john-sutter-profile-image-large-169.jpg
-  email    : username@xyz.com
-  github   : username
-  twitter  : username
-  linkedin : username
-  facebook : username
-
-
-# Collections
-collections:
-  projects:
-    output: true
-    permalink: /projects/:name
-
-
-# Default values for collections
-defaults:
-  - scope:
-      path: ""
-      type: "projects"
-    values:
-      layout: "page"
-
-
-# Posts default Permalink
-permalink: articles/:title
-
-
-# Exclude from processing.
-exclude:
-- README.md
-- CONTRIBUTING.md
-- LICENSE
-- Gemfile
-- Gemfile.lock
+#### Phantom Navigation menu
+enable_nav: true
+nav_item:
+  - { url: '/', text: 'Home' }
+  - { url: '#portfolio', text: 'Projects' }
+  - { url: '/about', text: 'About' }
