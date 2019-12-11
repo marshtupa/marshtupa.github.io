@@ -18,10 +18,10 @@ title: "Hello."
 email: 'marshtupa18@gmail.com'
 description: "Hello, I'm Marshtupa Bogdan. I'm a student of school 21 and MTUCI."
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "http://lmaron-g.github.io/" # the base hostname & protocol for your site, e.g. http://example.com
+url: "http://marshtupa.github.io/" # the base hostname & protocol for your site, e.g. http://example.com
 instagram_username: 'marshtupabogdan'
 vk_username: 'b.marshtupa'
-github_username: 'lmaron-g'
+github_username: 'marshtupa'
 
 # Build settings
 markdown: kramdown
