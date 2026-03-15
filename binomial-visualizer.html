@@ -699,6 +699,7 @@
       const mean = n * p;
       const variance = n * p * (1 - p);
       const sigma = Math.sqrt(variance);
+      const relativeSigma = sigma / n;
       const mode = Math.floor((n + 1) * p);
       stats.innerHTML =
         `<p class="stats-title">Ключевые параметры</p>` +
@@ -706,6 +707,7 @@
           `<div class="stats-item"><p class="metric-name">E[S]</p><p class="metric-value">${round(mean, 3)}</p><p class="metric-desc">Среднее число успехов S в серии из n испытаний.</p></div>` +
           `<div class="stats-item"><p class="metric-name">Var(S)</p><p class="metric-value">${round(variance, 3)}</p><p class="metric-desc">Дисперсия S: насколько число успехов колеблется вокруг E[S].</p></div>` +
           `<div class="stats-item"><p class="metric-name">σ = √Var(S)</p><p class="metric-value">${round(sigma, 3)}</p><p class="metric-desc">Стандартное отклонение S, то есть «типичный масштаб» разброса.</p></div>` +
+          `<div class="stats-item"><p class="metric-name">Относительный шум: σ / n</p><p class="metric-value">${(relativeSigma * 100).toFixed(2)}%</p><p class="metric-desc">Доля стандартного отклонения от числа испытаний. При фиксированном p уменьшается примерно как 1/√n.</p></div>` +
           `<div class="stats-item"><p class="metric-name">Мода</p><p class="metric-value">${mode}</p><p class="metric-desc">Самое вероятное число успехов в серии (пик распределения).</p></div>` +
           `<div class="stats-item"><p class="metric-name">n и p</p><p class="metric-value">n = ${n}, p = ${p.toFixed(2)}</p><p class="metric-desc">n — число испытаний в серии, p — вероятность успеха в одном испытании.</p></div>` +
           `<div class="stats-item"><p class="metric-name">Серий симуляции</p><p class="metric-value">${runs}</p><p class="metric-desc">Сколько раз повторяем целую серию из n испытаний для эмпирической гистограммы.</p></div>` +
