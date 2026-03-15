@@ -214,6 +214,60 @@ button.btn, input.btn {
   }
 }
 
+.extra-projects {
+  margin: 1em 0 6em;
+}
+
+.extra-projects-header {
+  text-align: center;
+}
+
+.extra-projects-track {
+  display: flex;
+  gap: 1.5em;
+  overflow-x: auto;
+  padding: 1em 0.25em 0.5em;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.extra-project-card {
+  min-width: 320px;
+  max-width: 360px;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  background: #ffffff;
+  border: 1px solid #d7e2e9;
+  border-radius: 10px;
+  padding: 1.5em;
+  box-shadow: 0 5px 20px rgba(46, 68, 83, 0.08);
+
+  h3 {
+    margin-top: 0;
+    margin-bottom: 0.7em;
+  }
+
+  p {
+    font-size: 1.05em;
+    margin-bottom: 1.2em;
+  }
+}
+
+.extra-project-link {
+  display: inline-block;
+  font-weight: 700;
+}
+
+@include bp-xsmall {
+  .extra-projects {
+    margin: 0 0 3em;
+  }
+
+  .extra-project-card {
+    min-width: 84%;
+  }
+}
+
 .section-title {
   position: relative;
   margin: 0 auto;
