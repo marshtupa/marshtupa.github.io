@@ -1,39 +1,824 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AB Significance Visualizer</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A/B Significance Visualizer</title>
   <style>
+    :root {
+      --bg-1: #f6efe3;
+      --bg-2: #dff1f0;
+      --card: rgba(255, 255, 255, 0.86);
+      --text: #122028;
+      --muted: #52616a;
+      --line: rgba(18, 32, 40, 0.16);
+      --a: #1b7f8e;
+      --a-soft: rgba(27, 127, 142, 0.26);
+      --b: #dd7a2f;
+      --b-soft: rgba(221, 122, 47, 0.24);
+      --d: #0f5f52;
+      --d-soft: rgba(15, 95, 82, 0.25);
+      --danger: #c4462f;
+      --ok: #0e755b;
+      --shadow: 0 20px 55px rgba(17, 35, 38, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f2f5f7;
-      color: #1f2d3a;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Gill Sans", "Trebuchet MS", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1100px 600px at 90% -10%, rgba(201, 156, 65, 0.22), transparent 65%),
+        radial-gradient(1000px 700px at -20% 20%, rgba(40, 128, 146, 0.26), transparent 65%),
+        linear-gradient(120deg, var(--bg-1), var(--bg-2));
+      padding: 24px;
     }
-    .wrap {
-      max-width: 900px;
-      margin: 12vh auto;
-      padding: 0 20px;
+
+    .app {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
     }
-    .card {
+
+    .hero,
+    .controls,
+    .stats,
+    .panel,
+    .notes {
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .hero {
+      padding: 18px 22px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.25rem, 1rem + 1.2vw, 2rem);
+      letter-spacing: 0.02em;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.42;
+    }
+
+    .controls {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .control {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(18, 32, 40, 0.1);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .control label {
+      font-size: 0.94rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .control .row {
+      display: grid;
+      grid-template-columns: 1fr 126px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .control input[type="range"] {
+      width: 100%;
+      accent-color: var(--a);
+      cursor: ew-resize;
+    }
+
+    .control input[type="number"],
+    .control select {
+      width: 100%;
+      border: 1px solid rgba(18, 32, 40, 0.2);
+      border-radius: 10px;
+      padding: 7px 9px;
+      font: inherit;
+      color: var(--text);
       background: #fff;
-      border: 1px solid #d6e1e8;
-      border-radius: 12px;
-      padding: 28px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
     }
-    h1 { margin-top: 0; }
-    a { color: #0d7a8d; font-weight: 600; }
+
+    .stats {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid rgba(18, 32, 40, 0.08);
+      border-radius: 14px;
+      padding: 12px;
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .stat h3 {
+      margin: 0;
+      font-size: 0.94rem;
+      letter-spacing: 0.02em;
+    }
+
+    .mono {
+      font-family: "SF Mono", "Menlo", "Cascadia Mono", monospace;
+    }
+
+    .main {
+      font-size: 1.08rem;
+      font-weight: 700;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .panel {
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 1.02rem;
+      letter-spacing: 0.02em;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+
+    .dot {
+      display: inline-flex;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-right: 6px;
+    }
+
+    .dot.a { background: var(--a); }
+    .dot.b { background: var(--b); }
+    .dot.d { background: var(--d); }
+    .dot.zero { background: var(--danger); }
+
+    canvas {
+      width: 100%;
+      height: 320px;
+      border: 1px solid rgba(18, 32, 40, 0.12);
+      border-radius: 12px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(249, 251, 251, 0.9));
+    }
+
+    .notes {
+      padding: 14px 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.44;
+    }
+
+    .status {
+      font-weight: 700;
+    }
+
+    .status.ok {
+      color: var(--ok);
+    }
+
+    .status.bad {
+      color: var(--danger);
+    }
+
+    @media (max-width: 980px) {
+      .controls,
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .control .row {
+        grid-template-columns: 1fr;
+      }
+
+      canvas {
+        height: 280px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>AB Significance Visualizer</h1>
-      <p>This page is wired into the portfolio gallery and ready for your visualizer code.</p>
-      <p><a href="/">Back to home</a></p>
-    </div>
-  </div>
+  <main class="app">
+    <section class="hero">
+      <h1>Конструктор статзначимости для A/B</h1>
+      <p>
+        Меняй <span class="mono">CR_A</span>, <span class="mono">n_A</span>, <span class="mono">CR_B</span>, <span class="mono">n_B</span> и смотри,
+        как меняются распределения, 95% доверительные интервалы и вывод по нулевой гипотезе.
+      </p>
+    </section>
+
+    <section class="controls">
+      <div class="control">
+        <label for="p1Range">Конверсия A, %</label>
+        <div class="row">
+          <input id="p1Range" type="range" min="0" max="100" step="0.01" value="5" />
+          <input id="p1Number" type="number" min="0" max="100" step="0.01" value="5" />
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="n1Range">Размер выборки A, n</label>
+        <div class="row">
+          <input id="n1Range" type="range" min="100" max="1000000" step="100" value="10000" />
+          <input id="n1Number" type="number" min="100" max="1000000" step="100" value="10000" />
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="p2Range">Конверсия B, %</label>
+        <div class="row">
+          <input id="p2Range" type="range" min="0" max="100" step="0.01" value="6" />
+          <input id="p2Number" type="number" min="0" max="100" step="0.01" value="6" />
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="n2Range">Размер выборки B, n</label>
+        <div class="row">
+          <input id="n2Range" type="range" min="100" max="1000000" step="100" value="10000" />
+          <input id="n2Number" type="number" min="100" max="1000000" step="100" value="10000" />
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="confidence">Уровень доверия</label>
+        <div class="row">
+          <select id="confidence">
+            <option value="90">90%</option>
+            <option value="95" selected>95%</option>
+            <option value="99">99%</option>
+          </select>
+          <input id="zValue" type="number" value="1.959964" step="0.000001" readonly />
+        </div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <article class="stat">
+        <h3>Группа A</h3>
+        <div id="meanA" class="main mono"></div>
+        <div id="ciA" class="mono"></div>
+        <div id="sampleA" class="muted"></div>
+      </article>
+
+      <article class="stat">
+        <h3>Группа B</h3>
+        <div id="meanB" class="main mono"></div>
+        <div id="ciB" class="mono"></div>
+        <div id="sampleB" class="muted"></div>
+      </article>
+
+      <article class="stat">
+        <h3>Разница A - B</h3>
+        <div id="diffValue" class="main mono"></div>
+        <div id="ciDiff" class="mono"></div>
+        <div id="zAndP" class="muted mono"></div>
+      </article>
+
+      <article class="stat">
+        <h3>Гипотеза H0: (A - B) = 0</h3>
+        <div id="hypothesis" class="main status"></div>
+        <div id="hypothesisText" class="muted"></div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2>Распределения конверсии A и B</h2>
+      <div class="legend">
+        <span><span class="dot a"></span>кривая A + 95% CI</span>
+        <span><span class="dot b"></span>кривая B + 95% CI</span>
+      </div>
+      <canvas id="conversionsChart"></canvas>
+    </section>
+
+    <section class="panel">
+      <h2>Распределение разницы (A - B)</h2>
+      <div class="legend">
+        <span><span class="dot d"></span>кривая разницы + 95% CI</span>
+        <span><span class="dot zero"></span>линия нуля</span>
+      </div>
+      <canvas id="differenceChart"></canvas>
+    </section>
+
+    <section class="notes">
+      Используется нормальная аппроксимация долей:
+      <span class="mono">SE(p)=sqrt(p(1-p)/n)</span>,
+      <span class="mono">SE(p_A-p_B)=sqrt(p_A(1-p_A)/n_A + p_B(1-p_B)/n_B)</span>.
+      Для низких конверсий или малых выборок точнее применять биномиальные/байесовские методы.
+    </section>
+  </main>
+
+  <script>
+    const Z_BY_CONF = {
+      90: 1.6448536269514722,
+      95: 1.959963984540054,
+      99: 2.5758293035489004,
+    };
+
+    const state = {
+      p1: 5,
+      n1: 10000,
+      p2: 6,
+      n2: 10000,
+      confidence: 95,
+    };
+
+    const ui = {
+      p1Range: document.getElementById("p1Range"),
+      p1Number: document.getElementById("p1Number"),
+      n1Range: document.getElementById("n1Range"),
+      n1Number: document.getElementById("n1Number"),
+      p2Range: document.getElementById("p2Range"),
+      p2Number: document.getElementById("p2Number"),
+      n2Range: document.getElementById("n2Range"),
+      n2Number: document.getElementById("n2Number"),
+      confidence: document.getElementById("confidence"),
+      zValue: document.getElementById("zValue"),
+      meanA: document.getElementById("meanA"),
+      ciA: document.getElementById("ciA"),
+      sampleA: document.getElementById("sampleA"),
+      meanB: document.getElementById("meanB"),
+      ciB: document.getElementById("ciB"),
+      sampleB: document.getElementById("sampleB"),
+      diffValue: document.getElementById("diffValue"),
+      ciDiff: document.getElementById("ciDiff"),
+      zAndP: document.getElementById("zAndP"),
+      hypothesis: document.getElementById("hypothesis"),
+      hypothesisText: document.getElementById("hypothesisText"),
+      conversionsChart: document.getElementById("conversionsChart"),
+      differenceChart: document.getElementById("differenceChart"),
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function normalPdf(x, mean, sigma) {
+      if (sigma <= 0) return 0;
+      const z = (x - mean) / sigma;
+      return Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
+    }
+
+    function erf(x) {
+      const sign = x >= 0 ? 1 : -1;
+      const absX = Math.abs(x);
+      const a1 = 0.254829592;
+      const a2 = -0.284496736;
+      const a3 = 1.421413741;
+      const a4 = -1.453152027;
+      const a5 = 1.061405429;
+      const p = 0.3275911;
+
+      const t = 1 / (1 + p * absX);
+      const y = 1 - (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) * Math.exp(-absX * absX);
+      return sign * y;
+    }
+
+    function normalCdf(x) {
+      return 0.5 * (1 + erf(x / Math.SQRT2));
+    }
+
+    function fmtPct(value, digits = 3) {
+      return `${(value * 100).toFixed(digits)}%`;
+    }
+
+    function fmtPp(value, digits = 3) {
+      const sign = value > 0 ? "+" : "";
+      return `${sign}${(value * 100).toFixed(digits)} п.п.`;
+    }
+
+    function fmtN(value) {
+      return new Intl.NumberFormat("ru-RU").format(value);
+    }
+
+    function fmtPValue(value) {
+      if (!Number.isFinite(value)) return "0";
+      if (value < 0.0001) return "< 0.0001";
+      return value.toFixed(4);
+    }
+
+    function setupLinkedControl({ rangeEl, numberEl, key, integer = false }) {
+      const min = Number(rangeEl.min);
+      const max = Number(rangeEl.max);
+      const step = Number(rangeEl.step || (integer ? 1 : 0.01));
+      const precision = (String(step).split(".")[1] || "").length;
+
+      const normalize = (raw) => {
+        let value = Number(raw);
+        if (!Number.isFinite(value)) value = Number(numberEl.value);
+        if (!Number.isFinite(value)) value = Number(rangeEl.value);
+        value = clamp(value, min, max);
+        if (integer) return Math.round(value);
+        return Number(value.toFixed(precision));
+      };
+
+      const apply = (raw) => {
+        const value = normalize(raw);
+        state[key] = value;
+        rangeEl.value = String(value);
+        numberEl.value = String(value);
+        update();
+      };
+
+      rangeEl.addEventListener("input", (event) => apply(event.target.value));
+      numberEl.addEventListener("input", (event) => apply(event.target.value));
+
+      const initial = normalize(numberEl.value);
+      state[key] = initial;
+      rangeEl.value = String(initial);
+      numberEl.value = String(initial);
+    }
+
+    function computeStats() {
+      const pA = state.p1 / 100;
+      const pB = state.p2 / 100;
+      const nA = state.n1;
+      const nB = state.n2;
+      const z = Z_BY_CONF[state.confidence] || Z_BY_CONF[95];
+
+      const seA = Math.sqrt(Math.max((pA * (1 - pA)) / nA, 0));
+      const seB = Math.sqrt(Math.max((pB * (1 - pB)) / nB, 0));
+
+      const ciA = [pA - z * seA, pA + z * seA];
+      const ciB = [pB - z * seB, pB + z * seB];
+
+      const diff = pA - pB;
+      const seDiff = Math.sqrt(Math.max((pA * (1 - pA)) / nA + (pB * (1 - pB)) / nB, 0));
+      const ciDiff = [diff - z * seDiff, diff + z * seDiff];
+
+      let zScore = 0;
+      let pValue = 1;
+      if (seDiff > 0) {
+        zScore = diff / seDiff;
+        pValue = clamp(2 * (1 - normalCdf(Math.abs(zScore))), 0, 1);
+      } else if (Math.abs(diff) > Number.EPSILON) {
+        zScore = diff > 0 ? Infinity : -Infinity;
+        pValue = 0;
+      }
+
+      const significant = ciDiff[0] > 0 || ciDiff[1] < 0;
+
+      return {
+        z,
+        pA,
+        pB,
+        nA,
+        nB,
+        seA,
+        seB,
+        ciA,
+        ciB,
+        diff,
+        seDiff,
+        ciDiff,
+        zScore,
+        pValue,
+        significant,
+        convA: Math.round(pA * nA),
+        convB: Math.round(pB * nB),
+      };
+    }
+
+    function drawAxes(ctx, width, height, xMin, xMax, valueFormatter) {
+      const m = { left: 62, right: 20, top: 22, bottom: 34 };
+      const plotW = width - m.left - m.right;
+      const plotH = height - m.top - m.bottom;
+      const baselineY = m.top + plotH;
+
+      ctx.strokeStyle = "rgba(18, 32, 40, 0.16)";
+      ctx.fillStyle = "rgba(18, 32, 40, 0.62)";
+      ctx.lineWidth = 1;
+      ctx.font = '12px "Avenir Next", "Trebuchet MS", sans-serif';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+
+      const ticks = 6;
+      for (let i = 0; i <= ticks; i++) {
+        const ratio = i / ticks;
+        const xValue = xMin + ratio * (xMax - xMin);
+        const xPx = m.left + ratio * plotW;
+
+        ctx.beginPath();
+        ctx.moveTo(xPx, m.top);
+        ctx.lineTo(xPx, baselineY);
+        ctx.stroke();
+
+        ctx.fillText(valueFormatter(xValue), xPx, baselineY + 7);
+      }
+
+      ctx.strokeStyle = "rgba(18, 32, 40, 0.42)";
+      ctx.beginPath();
+      ctx.moveTo(m.left, baselineY);
+      ctx.lineTo(m.left + plotW, baselineY);
+      ctx.stroke();
+
+      return {
+        m,
+        plotW,
+        plotH,
+        baselineY,
+        xToPx: (x) => m.left + ((x - xMin) / (xMax - xMin)) * plotW,
+      };
+    }
+
+    function drawFilledCurve(ctx, points, xToPx, yToPx, baselineY, fillStyle) {
+      if (!points.length) return;
+      ctx.beginPath();
+      ctx.moveTo(xToPx(points[0].x), baselineY);
+      for (const point of points) {
+        ctx.lineTo(xToPx(point.x), yToPx(point.y));
+      }
+      ctx.lineTo(xToPx(points[points.length - 1].x), baselineY);
+      ctx.closePath();
+      ctx.fillStyle = fillStyle;
+      ctx.fill();
+    }
+
+    function drawCurveLine(ctx, points, xToPx, yToPx, strokeStyle, lineWidth = 2.2) {
+      if (!points.length) return;
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i++) {
+        const point = points[i];
+        if (i === 0) ctx.moveTo(xToPx(point.x), yToPx(point.y));
+        else ctx.lineTo(xToPx(point.x), yToPx(point.y));
+      }
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+
+    function resizeCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, width: rect.width, height: rect.height };
+    }
+
+    function drawConversionChart(stats) {
+      const { ctx, width, height } = resizeCanvas(ui.conversionsChart);
+      ctx.clearRect(0, 0, width, height);
+
+      const sigmaA = Math.max(stats.seA, 1e-6);
+      const sigmaB = Math.max(stats.seB, 1e-6);
+
+      let xMin = Math.min(stats.pA - 4 * sigmaA, stats.pB - 4 * sigmaB) - 0.01;
+      let xMax = Math.max(stats.pA + 4 * sigmaA, stats.pB + 4 * sigmaB) + 0.01;
+      xMin = clamp(xMin, 0, 1);
+      xMax = clamp(xMax, 0, 1);
+
+      if (xMax - xMin < 0.02) {
+        const center = (stats.pA + stats.pB) / 2;
+        xMin = clamp(center - 0.01, 0, 1);
+        xMax = clamp(center + 0.01, 0, 1);
+      }
+
+      if (xMax <= xMin) {
+        xMin = 0;
+        xMax = 0.1;
+      }
+
+      const sampleCount = 420;
+      const pointsA = [];
+      const pointsB = [];
+      let yMax = 0;
+
+      for (let i = 0; i <= sampleCount; i++) {
+        const x = xMin + (i / sampleCount) * (xMax - xMin);
+        const yA = normalPdf(x, stats.pA, sigmaA);
+        const yB = normalPdf(x, stats.pB, sigmaB);
+        pointsA.push({ x, y: yA });
+        pointsB.push({ x, y: yB });
+        yMax = Math.max(yMax, yA, yB);
+      }
+
+      yMax = Math.max(yMax * 1.08, 1);
+
+      const axis = drawAxes(
+        ctx,
+        width,
+        height,
+        xMin,
+        xMax,
+        (value) => `${(value * 100).toFixed(xMax - xMin < 0.08 ? 2 : 1)}%`
+      );
+
+      const yToPx = (y) => axis.m.top + axis.plotH - (y / yMax) * axis.plotH;
+
+      const ciAStart = clamp(stats.ciA[0], xMin, xMax);
+      const ciAEnd = clamp(stats.ciA[1], xMin, xMax);
+      const ciBStart = clamp(stats.ciB[0], xMin, xMax);
+      const ciBEnd = clamp(stats.ciB[1], xMin, xMax);
+
+      if (ciAEnd > ciAStart) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(axis.xToPx(ciAStart), axis.m.top, axis.xToPx(ciAEnd) - axis.xToPx(ciAStart), axis.plotH);
+        ctx.clip();
+        drawFilledCurve(ctx, pointsA, axis.xToPx, yToPx, axis.baselineY, getComputedStyle(document.documentElement).getPropertyValue("--a-soft"));
+        ctx.restore();
+      }
+
+      if (ciBEnd > ciBStart) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(axis.xToPx(ciBStart), axis.m.top, axis.xToPx(ciBEnd) - axis.xToPx(ciBStart), axis.plotH);
+        ctx.clip();
+        drawFilledCurve(ctx, pointsB, axis.xToPx, yToPx, axis.baselineY, getComputedStyle(document.documentElement).getPropertyValue("--b-soft"));
+        ctx.restore();
+      }
+
+      drawCurveLine(ctx, pointsA, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--a"));
+      drawCurveLine(ctx, pointsB, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--b"));
+
+      ctx.setLineDash([6, 5]);
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = "rgba(27, 127, 142, 0.72)";
+      ctx.beginPath();
+      ctx.moveTo(axis.xToPx(stats.pA), axis.m.top);
+      ctx.lineTo(axis.xToPx(stats.pA), axis.baselineY);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(221, 122, 47, 0.76)";
+      ctx.beginPath();
+      ctx.moveTo(axis.xToPx(stats.pB), axis.m.top);
+      ctx.lineTo(axis.xToPx(stats.pB), axis.baselineY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "rgba(18, 32, 40, 0.7)";
+      ctx.font = '12px "Avenir Next", "Trebuchet MS", sans-serif';
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("Конверсия", axis.m.left + 2, 5);
+    }
+
+    function drawDifferenceChart(stats) {
+      const { ctx, width, height } = resizeCanvas(ui.differenceChart);
+      ctx.clearRect(0, 0, width, height);
+
+      const sigma = Math.max(stats.seDiff, 1e-6);
+      let xMin = Math.min(stats.diff - 4 * sigma, stats.ciDiff[0], 0) - 0.003;
+      let xMax = Math.max(stats.diff + 4 * sigma, stats.ciDiff[1], 0) + 0.003;
+
+      if (xMax - xMin < 0.008) {
+        xMin = stats.diff - 0.004;
+        xMax = stats.diff + 0.004;
+      }
+
+      const sampleCount = 420;
+      const points = [];
+      let yMax = 0;
+
+      for (let i = 0; i <= sampleCount; i++) {
+        const x = xMin + (i / sampleCount) * (xMax - xMin);
+        const y = normalPdf(x, stats.diff, sigma);
+        points.push({ x, y });
+        yMax = Math.max(yMax, y);
+      }
+
+      yMax = Math.max(yMax * 1.08, 1);
+
+      const axis = drawAxes(
+        ctx,
+        width,
+        height,
+        xMin,
+        xMax,
+        (value) => {
+          const sign = value > 0 ? "+" : "";
+          const digits = xMax - xMin < 0.08 ? 2 : 1;
+          return `${sign}${(value * 100).toFixed(digits)} п.п.`;
+        }
+      );
+
+      const yToPx = (y) => axis.m.top + axis.plotH - (y / yMax) * axis.plotH;
+
+      const ciStart = clamp(stats.ciDiff[0], xMin, xMax);
+      const ciEnd = clamp(stats.ciDiff[1], xMin, xMax);
+      if (ciEnd > ciStart) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(axis.xToPx(ciStart), axis.m.top, axis.xToPx(ciEnd) - axis.xToPx(ciStart), axis.plotH);
+        ctx.clip();
+        drawFilledCurve(ctx, points, axis.xToPx, yToPx, axis.baselineY, getComputedStyle(document.documentElement).getPropertyValue("--d-soft"));
+        ctx.restore();
+      }
+
+      drawCurveLine(ctx, points, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--d"));
+
+      ctx.setLineDash([7, 4]);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(196, 70, 47, 0.95)";
+      ctx.beginPath();
+      ctx.moveTo(axis.xToPx(0), axis.m.top);
+      ctx.lineTo(axis.xToPx(0), axis.baselineY);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(15, 95, 82, 0.75)";
+      ctx.beginPath();
+      ctx.moveTo(axis.xToPx(stats.diff), axis.m.top);
+      ctx.lineTo(axis.xToPx(stats.diff), axis.baselineY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "rgba(18, 32, 40, 0.7)";
+      ctx.font = '12px "Avenir Next", "Trebuchet MS", sans-serif';
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("Разница A - B", axis.m.left + 2, 5);
+    }
+
+    function renderStats(stats) {
+      ui.zValue.value = stats.z.toFixed(6);
+
+      ui.meanA.textContent = fmtPct(stats.pA);
+      ui.ciA.textContent = `CI: [${fmtPct(stats.ciA[0])}; ${fmtPct(stats.ciA[1])}]`;
+      ui.sampleA.textContent = `SE=${fmtPct(stats.seA)} | конверсий ≈ ${fmtN(stats.convA)} из ${fmtN(stats.nA)}`;
+
+      ui.meanB.textContent = fmtPct(stats.pB);
+      ui.ciB.textContent = `CI: [${fmtPct(stats.ciB[0])}; ${fmtPct(stats.ciB[1])}]`;
+      ui.sampleB.textContent = `SE=${fmtPct(stats.seB)} | конверсий ≈ ${fmtN(stats.convB)} из ${fmtN(stats.nB)}`;
+
+      ui.diffValue.textContent = fmtPp(stats.diff);
+      ui.ciDiff.textContent = `CI: [${fmtPp(stats.ciDiff[0])}; ${fmtPp(stats.ciDiff[1])}]`;
+      ui.zAndP.textContent = `z=${Number.isFinite(stats.zScore) ? stats.zScore.toFixed(4) : "inf"}, p-value ${fmtPValue(stats.pValue)}`;
+
+      if (stats.significant) {
+        ui.hypothesis.textContent = "H0 отвергается";
+        ui.hypothesis.classList.remove("bad");
+        ui.hypothesis.classList.add("ok");
+        ui.hypothesisText.textContent = "0 не попадает в CI разницы. Изменение статистически значимо.";
+      } else {
+        ui.hypothesis.textContent = "Нет оснований отвергнуть H0";
+        ui.hypothesis.classList.remove("ok");
+        ui.hypothesis.classList.add("bad");
+        ui.hypothesisText.textContent = "0 попадает в CI разницы. Статзначимость не подтверждена.";
+      }
+    }
+
+    function update() {
+      const stats = computeStats();
+      renderStats(stats);
+      drawConversionChart(stats);
+      drawDifferenceChart(stats);
+    }
+
+    setupLinkedControl({ rangeEl: ui.p1Range, numberEl: ui.p1Number, key: "p1" });
+    setupLinkedControl({ rangeEl: ui.n1Range, numberEl: ui.n1Number, key: "n1", integer: true });
+    setupLinkedControl({ rangeEl: ui.p2Range, numberEl: ui.p2Number, key: "p2" });
+    setupLinkedControl({ rangeEl: ui.n2Range, numberEl: ui.n2Number, key: "n2", integer: true });
+
+    ui.confidence.addEventListener("input", (event) => {
+      state.confidence = Number(event.target.value);
+      update();
+    });
+
+    state.confidence = Number(ui.confidence.value);
+
+    window.addEventListener("resize", update);
+    update();
+  </script>
 </body>
 </html>
