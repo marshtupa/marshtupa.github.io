@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Визуализатор нормального распределения</title>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    :root {
+      --bg-a: #f5efe2;
+      --bg-b: #dceef0;
+      --card: rgba(255, 255, 255, 0.88);
+      --ink: #13232c;
+      --muted: #4f626e;
+      --line: rgba(19, 35, 44, 0.16);
+      --curve: #146a7c;
+      --mu: #cc5f22;
+      --sigma: #14775d;
+      --mad: #9d3d1d;
+      --grid: rgba(19, 35, 44, 0.1);
+      --shadow: 0 20px 56px rgba(14, 32, 40, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Gill Sans", "Trebuchet MS", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(860px 500px at 8% -8%, rgba(180, 122, 46, 0.22), transparent 62%),
+        radial-gradient(820px 540px at 95% 105%, rgba(22, 114, 141, 0.24), transparent 60%),
+        linear-gradient(130deg, var(--bg-a), var(--bg-b));
+      padding: 24px 16px 34px;
+    }
+
+    .app {
+      max-width: 1040px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.64);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(6px);
+    }
+
+    .hero {
+      padding: 18px 22px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.28rem, 1rem + 1.2vw, 2rem);
+      letter-spacing: 0.02em;
+    }
+
+    .lead {
+      margin: 8px 0 0;
+      max-width: 850px;
+      color: var(--muted);
+      line-height: 1.42;
+    }
+
+    .formula-panel {
+      padding: 14px 18px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .formula-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .formula-item {
+      flex: 1 1 320px;
+      min-width: 0;
+    }
+
+    .formula-title {
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      font-size: 0.96rem;
+    }
+
+    .formula {
+      margin: 0;
+      font-size: 1.06rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: normal;
+    }
+
+    .subformula {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .formula-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .controls {
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .control {
+      display: grid;
+      gap: 7px;
+      align-content: start;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(19, 35, 44, 0.12);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    label {
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      font-size: 0.96rem;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      border: 1px solid rgba(19, 35, 44, 0.24);
+      border-radius: 10px;
+      padding: 8px 9px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .control-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .chart-panel {
+      padding: 14px 16px 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .chart-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .axis-toggle,
+    .axis-reset {
+      border: 1px solid rgba(19, 35, 44, 0.22);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--ink);
+      padding: 6px 10px;
+      font: inherit;
+      font-size: 0.86rem;
+      cursor: pointer;
+    }
+
+    .axis-toggle:hover,
+    .axis-reset:hover {
+      background: #fff;
+    }
+
+    .axis-editor {
+      display: none;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid rgba(19, 35, 44, 0.16);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.75);
+    }
+
+    .axis-editor.open {
+      display: grid;
+    }
+
+    .axis-field {
+      display: grid;
+      gap: 4px;
+    }
+
+    .axis-field label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0;
+    }
+
+    .axis-field input {
+      width: 100%;
+      border: 1px solid rgba(19, 35, 44, 0.24);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 0.86rem;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .chart-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .chart-head h2 {
+      margin: 0;
+      font-size: 1.02rem;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 3px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .swatch.curve { background: var(--curve); }
+    .swatch.mu { background: var(--mu); }
+    .swatch.sigma { background: var(--sigma); }
+    .swatch.mad { background: var(--mad); }
+
+    canvas {
+      width: 100%;
+      height: 360px;
+      border-radius: 12px;
+      border: 1px solid rgba(19, 35, 44, 0.12);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 250, 250, 0.94));
+      display: block;
+    }
+
+    .stats {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.75);
+      padding: 8px 10px;
+    }
+
+    .stat p {
+      margin: 0;
+      line-height: 1.3;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .stat strong {
+      display: block;
+      color: var(--ink);
+      font-size: 1rem;
+      margin-top: 4px;
+      font-family: "Cascadia Mono", "SF Mono", "Menlo", monospace;
+    }
+
+    .axes-note {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 840px) {
+      .controls,
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .axis-editor {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      canvas {
+        height: 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="panel hero">
+      <h1>Визуализатор нормального распределения</h1>
+      <p class="lead">
+        Меняйте только параметры <strong>μ</strong> (матожидание) и <strong>σ</strong> (стандартное отклонение), а график
+        плотности обновится сразу с линиями <strong>μ</strong>, <strong>μ ± σ</strong> и <strong>μ ± MAD</strong>.
+      </p>
+    </section>
+
+    <section class="panel formula-panel" aria-label="Формула">
+      <p class="formula-title">Формула плотности:</p>
+      <div class="formula-row">
+        <div class="formula-item">
+          <p class="formula">\[
+            f(x)=\frac{1}{\sigma\sqrt{2\pi}}e^{-\frac{1}{2}\left(\frac{x-\mu}{\sigma}\right)^2}
+          \]</p>
+        </div>
+        <div class="formula-item">
+          <p class="subformula">\[
+            \mathrm{MAD}=\sigma\sqrt{\frac{2}{\pi}}
+          \]</p>
+        </div>
+      </div>
+      <p class="formula-note">
+        \(\mu\) — математическое ожидание, \(\sigma\) — стандартное отклонение,
+        \(\mathrm{MAD}\) — mean absolute deviation (среднее абсолютное отклонение).
+      </p>
+    </section>
+
+    <section class="panel controls" aria-label="Параметры">
+      <div class="control">
+        <label for="muInput">μ — математическое ожидание</label>
+        <input id="muInput" type="number" value="0" step="0.1" />
+        <p class="control-hint">Любое действительное число.</p>
+      </div>
+
+      <div class="control">
+        <label for="sigmaInput">σ — стандартное отклонение</label>
+        <input id="sigmaInput" type="number" value="1" min="0.1" step="0.1" />
+        <p class="control-hint">Только положительное значение (σ &gt; 0).</p>
+      </div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="chart-head">
+        <h2>График функции плотности N(μ, σ²)</h2>
+        <div class="legend" aria-label="Легенда">
+          <span class="legend-item"><span class="swatch curve"></span>Плотность f(x)</span>
+          <span class="legend-item"><span class="swatch mu"></span>μ</span>
+          <span class="legend-item"><span class="swatch sigma"></span>μ ± σ</span>
+          <span class="legend-item"><span class="swatch mad"></span>μ ± MAD</span>
+        </div>
+      </div>
+      <div class="chart-toolbar">
+        <button id="axisToggle" class="axis-toggle" type="button" aria-expanded="false" aria-controls="axisEditor">Оси</button>
+        <button id="axisReset" class="axis-reset" type="button">Сбросить</button>
+      </div>
+      <div id="axisEditor" class="axis-editor" aria-label="Настройки осей">
+        <div class="axis-field">
+          <label for="xMinInput">x min</label>
+          <input id="xMinInput" type="number" step="0.1" value="-10" />
+        </div>
+        <div class="axis-field">
+          <label for="xMaxInput">x max</label>
+          <input id="xMaxInput" type="number" step="0.1" value="10" />
+        </div>
+        <div class="axis-field">
+          <label for="yMinInput">y min</label>
+          <input id="yMinInput" type="number" step="0.1" value="0" />
+        </div>
+        <div class="axis-field">
+          <label for="yMaxInput">y max</label>
+          <input id="yMaxInput" type="number" step="0.1" value="1.6" />
+        </div>
+      </div>
+
+      <canvas id="densityCanvas" width="920" height="360"></canvas>
+      <p id="axesNote" class="axes-note">Оси: x ∈ [-10, 10], y ∈ [0, 1.6].</p>
+
+      <div class="stats">
+        <div class="stat">
+          <p>Текущее μ</p>
+          <strong id="muValue">0.0000</strong>
+        </div>
+        <div class="stat">
+          <p>Текущее σ</p>
+          <strong id="sigmaValue">1.0000</strong>
+        </div>
+        <div class="stat">
+          <p>\(\mathrm{MAD} = \sigma \sqrt{2 / \pi}\)</p>
+          <strong id="madValue">0.7979</strong>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const muInput = document.getElementById("muInput");
+    const sigmaInput = document.getElementById("sigmaInput");
+    const muValue = document.getElementById("muValue");
+    const sigmaValue = document.getElementById("sigmaValue");
+    const madValue = document.getElementById("madValue");
+    const axesNote = document.getElementById("axesNote");
+    const canvas = document.getElementById("densityCanvas");
+    const ctx = canvas.getContext("2d");
+    const axisToggle = document.getElementById("axisToggle");
+    const axisReset = document.getElementById("axisReset");
+    const axisEditor = document.getElementById("axisEditor");
+    const xMinInput = document.getElementById("xMinInput");
+    const xMaxInput = document.getElementById("xMaxInput");
+    const yMinInput = document.getElementById("yMinInput");
+    const yMaxInput = document.getElementById("yMaxInput");
+
+    const state = {
+      mu: 0,
+      sigma: 1
+    };
+    const defaultAxis = {
+      xMin: -10,
+      xMax: 10,
+      yMin: 0,
+      yMax: 1.6
+    };
+    const axis = { ...defaultAxis };
+
+    function fmt(value) {
+      return value.toFixed(4);
+    }
+
+    function parseNumber(value, fallback) {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function normalPdf(x, mu, sigma) {
+      const z = (x - mu) / sigma;
+      return Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
+    }
+
+    function toCanvasCoords(width, height, xMin, xMax, yMin, yMax, x, y) {
+      const left = 58;
+      const right = 22;
+      const top = 20;
+      const bottom = 42;
+      const plotWidth = width - left - right;
+      const plotHeight = height - top - bottom;
+      const cx = left + ((x - xMin) / (xMax - xMin)) * plotWidth;
+      const cy = top + (1 - (y - yMin) / (yMax - yMin)) * plotHeight;
+      return { cx, cy, left, right, top, bottom, plotWidth, plotHeight };
+    }
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.max(320, canvas.clientWidth);
+      const height = Math.max(240, canvas.clientHeight);
+      const nextWidth = Math.round(width * dpr);
+      const nextHeight = Math.round(height * dpr);
+
+      if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+        canvas.width = nextWidth;
+        canvas.height = nextHeight;
+      }
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { width, height };
+    }
+
+    function drawMarker(x, label, color, style, chart) {
+      const { width, height, xMin, xMax, yMin, yMax } = chart;
+      const map = toCanvasCoords(width, height, xMin, xMax, yMin, yMax, x, 0);
+      if (map.cx < map.left || map.cx > width - map.right) return;
+
+      ctx.save();
+      ctx.beginPath();
+      if (style === "dashed") {
+        ctx.setLineDash([8, 6]);
+      } else if (style === "dotted") {
+        ctx.setLineDash([2, 5]);
+      } else {
+        ctx.setLineDash([]);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.8;
+      ctx.moveTo(map.cx, map.top);
+      ctx.lineTo(map.cx, height - map.bottom);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.font = "12px 'Cascadia Mono', Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(label, map.cx, map.top - 4);
+      ctx.restore();
+    }
+
+    function drawAxes(chart) {
+      const { width, height, xMin, xMax, yMin, yMax } = chart;
+      const base = toCanvasCoords(width, height, xMin, xMax, yMin, yMax, xMin, 0);
+      const xTicks = 8;
+      const yTicks = 6;
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(19, 35, 44, 0.1)";
+      ctx.fillStyle = "rgba(19, 35, 44, 0.72)";
+      ctx.lineWidth = 1;
+      ctx.font = "12px 'Cascadia Mono', Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+
+      for (let i = 0; i <= xTicks; i += 1) {
+        const x = xMin + (i / xTicks) * (xMax - xMin);
+        const point = toCanvasCoords(width, height, xMin, xMax, yMin, yMax, x, 0);
+        ctx.beginPath();
+        ctx.moveTo(point.cx, base.top);
+        ctx.lineTo(point.cx, height - base.bottom);
+        ctx.strokeStyle = "rgba(19, 35, 44, 0.1)";
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(19, 35, 44, 0.72)";
+        ctx.fillText(x.toFixed(2), point.cx, height - base.bottom + 6);
+      }
+
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let i = 0; i <= yTicks; i += 1) {
+        const y = yMin + (i / yTicks) * (yMax - yMin);
+        const point = toCanvasCoords(width, height, xMin, xMax, yMin, yMax, xMin, y);
+        ctx.beginPath();
+        ctx.moveTo(base.left, point.cy);
+        ctx.lineTo(width - base.right, point.cy);
+        ctx.strokeStyle = "rgba(19, 35, 44, 0.1)";
+        ctx.stroke();
+        ctx.fillStyle = "rgba(19, 35, 44, 0.72)";
+        ctx.fillText(y.toFixed(3), base.left - 8, point.cy);
+      }
+
+      ctx.strokeStyle = "rgba(19, 35, 44, 0.3)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(base.left, base.top);
+      ctx.lineTo(base.left, height - base.bottom);
+      ctx.lineTo(width - base.right, height - base.bottom);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(19, 35, 44, 0.8)";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("f(x)", base.left + 6, base.top - 4);
+
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("x", width - base.right, height - base.bottom - 6);
+      ctx.restore();
+    }
+
+    function drawCurve(chart) {
+      const { width, height, xMin, xMax, yMin, yMax, mu, sigma } = chart;
+      const points = 600;
+
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i <= points; i += 1) {
+        const t = i / points;
+        const x = xMin + t * (xMax - xMin);
+        const y = normalPdf(x, mu, sigma);
+        const yClamped = Math.min(y, yMax);
+        const { cx, cy } = toCanvasCoords(width, height, xMin, xMax, yMin, yMax, x, yClamped);
+        if (i === 0) {
+          ctx.moveTo(cx, cy);
+        } else {
+          ctx.lineTo(cx, cy);
+        }
+      }
+      ctx.lineWidth = 2.6;
+      ctx.strokeStyle = "#146a7c";
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function updateAxesNote() {
+      axesNote.textContent = `Оси: x ∈ [${fmt(axis.xMin)}, ${fmt(axis.xMax)}], y ∈ [${fmt(axis.yMin)}, ${fmt(axis.yMax)}].`;
+    }
+
+    function render() {
+      const { width, height } = resizeCanvas();
+      ctx.clearRect(0, 0, width, height);
+
+      const mu = state.mu;
+      const sigma = state.sigma;
+      const mad = sigma * Math.sqrt(2 / Math.PI);
+      const chart = {
+        width,
+        height,
+        xMin: axis.xMin,
+        xMax: axis.xMax,
+        yMin: axis.yMin,
+        yMax: axis.yMax,
+        mu,
+        sigma
+      };
+      drawAxes(chart);
+      drawCurve(chart);
+
+      drawMarker(mu, "μ", "#cc5f22", "solid", chart);
+      drawMarker(mu - sigma, "μ-σ", "#14775d", "dashed", chart);
+      drawMarker(mu + sigma, "μ+σ", "#14775d", "dashed", chart);
+      drawMarker(mu - mad, "μ-MAD", "#9d3d1d", "dotted", chart);
+      drawMarker(mu + mad, "μ+MAD", "#9d3d1d", "dotted", chart);
+
+      muValue.textContent = fmt(mu);
+      sigmaValue.textContent = fmt(sigma);
+      madValue.textContent = fmt(mad);
+      updateAxesNote();
+    }
+
+    function applyAxisInputs() {
+      const nextXMin = parseNumber(xMinInput.value, axis.xMin);
+      const nextXMax = parseNumber(xMaxInput.value, axis.xMax);
+      const nextYMin = parseNumber(yMinInput.value, axis.yMin);
+      const nextYMax = parseNumber(yMaxInput.value, axis.yMax);
+
+      axis.xMin = Math.min(nextXMin, nextXMax - 0.1);
+      axis.xMax = Math.max(nextXMax, axis.xMin + 0.1);
+      axis.yMin = Math.min(nextYMin, nextYMax - 0.1);
+      axis.yMax = Math.max(nextYMax, axis.yMin + 0.1);
+
+      xMinInput.value = String(axis.xMin);
+      xMaxInput.value = String(axis.xMax);
+      yMinInput.value = String(axis.yMin);
+      yMaxInput.value = String(axis.yMax);
+      render();
+    }
+
+    function resetAxis() {
+      axis.xMin = defaultAxis.xMin;
+      axis.xMax = defaultAxis.xMax;
+      axis.yMin = defaultAxis.yMin;
+      axis.yMax = defaultAxis.yMax;
+      xMinInput.value = String(axis.xMin);
+      xMaxInput.value = String(axis.xMax);
+      yMinInput.value = String(axis.yMin);
+      yMaxInput.value = String(axis.yMax);
+      render();
+    }
+
+    function syncState() {
+      const nextMu = parseNumber(muInput.value, state.mu);
+      const rawSigma = parseNumber(sigmaInput.value, state.sigma);
+      const nextSigma = Math.max(0.1, rawSigma);
+
+      state.mu = nextMu;
+      state.sigma = nextSigma;
+
+      if (Number.parseFloat(sigmaInput.value) !== nextSigma) {
+        sigmaInput.value = String(nextSigma);
+      }
+
+      render();
+    }
+
+    muInput.addEventListener("input", syncState);
+    sigmaInput.addEventListener("input", syncState);
+    xMinInput.addEventListener("input", applyAxisInputs);
+    xMaxInput.addEventListener("input", applyAxisInputs);
+    yMinInput.addEventListener("input", applyAxisInputs);
+    yMaxInput.addEventListener("input", applyAxisInputs);
+    axisToggle.addEventListener("click", () => {
+      const open = axisEditor.classList.toggle("open");
+      axisToggle.setAttribute("aria-expanded", String(open));
+    });
+    axisReset.addEventListener("click", resetAxis);
+    window.addEventListener("resize", render);
+
+    syncState();
+  </script>
+</body>
+</html>
