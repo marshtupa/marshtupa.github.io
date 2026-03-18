@@ -1,0 +1,202 @@
+[
+  {
+    "id": "sm_mde_up_small_base",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "mde_from_n",
+      "planDirectionMode": "b_gt_a",
+      "planBaseRate": 2,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 8000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "mde_from_n",
+      "directionMode": "b_gt_a",
+      "selectedMde": 0.00667039657,
+      "selectedDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "sm_mde_down_mid_base",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "mde_from_n",
+      "planDirectionMode": "b_lt_a",
+      "planBaseRate": 15,
+      "planAlpha": 0.05,
+      "planTargetPower": 90,
+      "planN": 25000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "mde_from_n",
+      "directionMode": "b_lt_a",
+      "selectedMde": 0.010204000084,
+      "selectedDirection": -1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "sm_mde_two_sided_high_base",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "mde_from_n",
+      "planDirectionMode": "two_sided",
+      "planBaseRate": 70,
+      "planAlpha": 0.1,
+      "planTargetPower": 80,
+      "planN": 12000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "mde_from_n",
+      "directionMode": "two_sided",
+      "selectedMde": 0.014810242755,
+      "selectedDirection": -1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "sm_mde_two_sided_mid_base",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "mde_from_n",
+      "planDirectionMode": "two_sided",
+      "planBaseRate": 35,
+      "planAlpha": 0.01,
+      "planTargetPower": 85,
+      "planN": 6000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "mde_from_n",
+      "directionMode": "two_sided",
+      "selectedMde": 0.031759524152,
+      "selectedDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "sm_n_up_typical",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "b_gt_a",
+      "planBaseRate": 5,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 10000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "b_gt_a",
+      "requiredN": 8143,
+      "selectedDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "sm_n_down_typical",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "b_lt_a",
+      "planBaseRate": 40,
+      "planAlpha": 0.05,
+      "planTargetPower": 85,
+      "planN": 10000,
+      "planMde": 2.5
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "b_lt_a",
+      "requiredN": 6818,
+      "selectedDirection": -1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "sm_n_two_sided_conservative",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "two_sided",
+      "planBaseRate": 30,
+      "planAlpha": 0.01,
+      "planTargetPower": 90,
+      "planN": 10000,
+      "planMde": 1.2
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "two_sided",
+      "requiredN": 43883,
+      "selectedDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "sm_n_low_effect_large_n",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "two_sided",
+      "planBaseRate": 10,
+      "planAlpha": 0.05,
+      "planTargetPower": 95,
+      "planN": 10000,
+      "planMde": 0.3
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "two_sided",
+      "requiredN": 263340,
+      "selectedDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "sm_n_up_not_feasible",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "b_gt_a",
+      "planBaseRate": 98,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 10000,
+      "planMde": 5
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "b_gt_a",
+      "requiredN": "Infinity",
+      "selectedDirection": 1,
+      "directionFeasible": false
+    }
+  },
+  {
+    "id": "sm_n_down_not_feasible",
+    "source": "statsmodels 0.14.6 (NormalIndPower + proportion_effectsize)",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "b_lt_a",
+      "planBaseRate": 1,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 10000,
+      "planMde": 2
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "b_lt_a",
+      "requiredN": "Infinity",
+      "selectedDirection": -1,
+      "directionFeasible": false
+    }
+  }
+]

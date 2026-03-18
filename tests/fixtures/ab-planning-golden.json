@@ -1,0 +1,284 @@
+[
+  {
+    "id": "mde_small_base_up",
+    "input": {
+      "plannerMode": "mde_from_n",
+      "planDirectionMode": "b_gt_a",
+      "planBaseRate": 2,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 8000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "mde_from_n",
+      "directionMode": "b_gt_a",
+      "baseRate": 0.02,
+      "targetPower": 0.8,
+      "alpha": 0.05,
+      "z": 1.95996398454,
+      "nPerGroup": 8000,
+      "mdeUp": 0.006686824505,
+      "mdeDown": 0.005745884407,
+      "selectedMde": 0.006686824505,
+      "selectedDirection": 1,
+      "hardestDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "mde_mid_base_down",
+    "input": {
+      "plannerMode": "mde_from_n",
+      "planDirectionMode": "b_lt_a",
+      "planBaseRate": 15,
+      "planAlpha": 0.05,
+      "planTargetPower": 90,
+      "planN": 25000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "mde_from_n",
+      "directionMode": "b_lt_a",
+      "baseRate": 0.15,
+      "targetPower": 0.9,
+      "alpha": 0.05,
+      "z": 1.95996398454,
+      "nPerGroup": 25000,
+      "mdeUp": 0.010498480264,
+      "mdeDown": 0.010204396123,
+      "selectedMde": 0.010204396123,
+      "selectedDirection": -1,
+      "hardestDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "mde_two_sided_high_base",
+    "input": {
+      "plannerMode": "mde_from_n",
+      "planDirectionMode": "two_sided",
+      "planBaseRate": 70,
+      "planAlpha": 0.1,
+      "planTargetPower": 80,
+      "planN": 12000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "mde_from_n",
+      "directionMode": "two_sided",
+      "baseRate": 0.7,
+      "targetPower": 0.8,
+      "alpha": 0.1,
+      "z": 1.644853626951,
+      "nPerGroup": 12000,
+      "mdeUp": 0.014603391157,
+      "mdeDown": 0.014809359606,
+      "selectedMde": 0.014809359606,
+      "selectedDirection": -1,
+      "hardestDirection": -1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "mde_boundary_only_down",
+    "input": {
+      "plannerMode": "mde_from_n",
+      "planDirectionMode": "two_sided",
+      "planBaseRate": 99.9,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 5000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "mde_from_n",
+      "directionMode": "two_sided",
+      "baseRate": 0.999,
+      "targetPower": 0.8,
+      "alpha": 0.05,
+      "z": 1.95996398454,
+      "nPerGroup": 5000,
+      "mdeUp": "Infinity",
+      "mdeDown": 0.002716811163,
+      "selectedMde": 0.002716811163,
+      "selectedDirection": -1,
+      "hardestDirection": -1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "n_up_typical",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "b_gt_a",
+      "planBaseRate": 5,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 10000,
+      "planMde": 1
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "b_gt_a",
+      "baseRate": 0.05,
+      "targetPower": 0.8,
+      "alpha": 0.05,
+      "z": 1.95996398454,
+      "mdeAbs": 0.01,
+      "upFeasible": true,
+      "downFeasible": true,
+      "nUp": 8155,
+      "nDown": 6743,
+      "requiredN": 8155,
+      "selectedDirection": 1,
+      "hardestDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "n_down_typical",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "b_lt_a",
+      "planBaseRate": 40,
+      "planAlpha": 0.05,
+      "planTargetPower": 85,
+      "planN": 10000,
+      "planMde": 2.5
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "b_lt_a",
+      "baseRate": 0.4,
+      "targetPower": 0.85,
+      "alpha": 0.05,
+      "z": 1.95996398454,
+      "mdeAbs": 0.025,
+      "upFeasible": true,
+      "downFeasible": true,
+      "nUp": 6959,
+      "nDown": 6815,
+      "requiredN": 6815,
+      "selectedDirection": -1,
+      "hardestDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "n_two_sided_conservative",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "two_sided",
+      "planBaseRate": 30,
+      "planAlpha": 0.01,
+      "planTargetPower": 90,
+      "planN": 10000,
+      "planMde": 1.2
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "two_sided",
+      "baseRate": 0.3,
+      "targetPower": 0.9,
+      "alpha": 0.01,
+      "z": 2.575829303549,
+      "mdeAbs": 0.012,
+      "upFeasible": true,
+      "downFeasible": true,
+      "nUp": 43880,
+      "nDown": 42888,
+      "requiredN": 43880,
+      "selectedDirection": 1,
+      "hardestDirection": 1,
+      "directionFeasible": true
+    }
+  },
+  {
+    "id": "n_up_not_feasible",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "b_gt_a",
+      "planBaseRate": 98,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 10000,
+      "planMde": 5
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "b_gt_a",
+      "baseRate": 0.98,
+      "targetPower": 0.8,
+      "alpha": 0.05,
+      "z": 1.95996398454,
+      "mdeAbs": 0.05,
+      "upFeasible": false,
+      "downFeasible": true,
+      "nUp": "Infinity",
+      "nDown": 266,
+      "requiredN": "Infinity",
+      "selectedDirection": 1,
+      "hardestDirection": -1,
+      "directionFeasible": false
+    }
+  },
+  {
+    "id": "n_down_not_feasible",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "b_lt_a",
+      "planBaseRate": 1,
+      "planAlpha": 0.05,
+      "planTargetPower": 80,
+      "planN": 10000,
+      "planMde": 2
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "b_lt_a",
+      "baseRate": 0.01,
+      "targetPower": 0.8,
+      "alpha": 0.05,
+      "z": 1.95996398454,
+      "mdeAbs": 0.02,
+      "upFeasible": true,
+      "downFeasible": false,
+      "nUp": 766,
+      "nDown": "Infinity",
+      "requiredN": "Infinity",
+      "selectedDirection": -1,
+      "hardestDirection": 1,
+      "directionFeasible": false
+    }
+  },
+  {
+    "id": "n_low_effect_large_n",
+    "input": {
+      "plannerMode": "n_from_mde",
+      "planDirectionMode": "two_sided",
+      "planBaseRate": 10,
+      "planAlpha": 0.05,
+      "planTargetPower": 95,
+      "planN": 10000,
+      "planMde": 0.3
+    },
+    "expected": {
+      "mode": "n_from_mde",
+      "directionMode": "two_sided",
+      "baseRate": 0.1,
+      "targetPower": 0.95,
+      "alpha": 0.05,
+      "z": 1.95996398454,
+      "mdeAbs": 0.003,
+      "upFeasible": true,
+      "downFeasible": true,
+      "nUp": 263347,
+      "nDown": 256416,
+      "requiredN": 263347,
+      "selectedDirection": 1,
+      "hardestDirection": 1,
+      "directionFeasible": true
+    }
+  }
+]
