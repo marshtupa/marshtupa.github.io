@@ -260,6 +260,37 @@
       background: #fff;
     }
 
+    .chart-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .chart-tools button {
+      border: 1px solid rgba(18, 32, 40, 0.2);
+      border-radius: 8px;
+      padding: 5px 9px;
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.84rem;
+      cursor: pointer;
+    }
+
+    .chart-tools button:hover {
+      background: #fff;
+    }
+
+    .zoom-label {
+      min-width: 84px;
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.01em;
+    }
+
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -360,6 +391,14 @@
       .panel-mode-control select {
         min-width: 0;
         width: 100%;
+      }
+
+      .chart-tools {
+        justify-content: flex-start;
+      }
+
+      .zoom-label {
+        text-align: left;
       }
     }
   </style>
@@ -535,6 +574,17 @@
         </div>
       </div>
 
+      <div class="control">
+        <label for="planDirectionMode">Направление эффекта</label>
+        <div class="row single">
+          <select id="planDirectionMode">
+            <option value="b_gt_a" selected>Односторонний: B &gt; A</option>
+            <option value="b_lt_a">Односторонний: B &lt; A</option>
+            <option value="two_sided">Двусторонний (консервативно)</option>
+          </select>
+        </div>
+      </div>
+
       <div id="planNControl" class="control">
         <label for="planNRange">Размер выборки в группе, n</label>
         <div class="row">
@@ -581,13 +631,29 @@
     </section>
 
     <section class="panel planning-only" hidden>
-      <h2>Мощность от размера выборки (Power vs n)</h2>
+      <div class="panel-head">
+        <h2>Мощность от размера выборки (Power vs n)</h2>
+        <div class="chart-tools">
+          <button id="planPowerZoomOut" type="button" title="Отдалить">−</button>
+          <button id="planPowerZoomIn" type="button" title="Приблизить">+</button>
+          <button id="planPowerZoomReset" type="button" title="Сбросить масштаб">Сброс</button>
+          <span id="planPowerZoomLabel" class="zoom-label mono">x1.00</span>
+        </div>
+      </div>
       <canvas id="planPowerChart"></canvas>
       <div id="planPowerNote" class="muted"></div>
     </section>
 
     <section class="panel planning-only" hidden>
-      <h2>Минимальный эффект от размера выборки (MDE vs n)</h2>
+      <div class="panel-head">
+        <h2>Минимальный эффект от размера выборки (MDE vs n)</h2>
+        <div class="chart-tools">
+          <button id="planMdeZoomOut" type="button" title="Отдалить">−</button>
+          <button id="planMdeZoomIn" type="button" title="Приблизить">+</button>
+          <button id="planMdeZoomReset" type="button" title="Сбросить масштаб">Сброс</button>
+          <span id="planMdeZoomLabel" class="zoom-label mono">x1.00</span>
+        </div>
+      </div>
       <canvas id="planMdeChart"></canvas>
       <div id="planMdeNote" class="muted"></div>
     </section>
@@ -610,6 +676,9 @@
     const CALC_MODE_PLANNING = "planning";
     const PLAN_MODE_MDE_FROM_N = "mde_from_n";
     const PLAN_MODE_N_FROM_MDE = "n_from_mde";
+    const PLAN_DIR_TWO_SIDED = "two_sided";
+    const PLAN_DIR_B_GT_A = "b_gt_a";
+    const PLAN_DIR_B_LT_A = "b_lt_a";
     const MAX_SOLVER_N = 2000000000;
 
     const state = {
@@ -626,11 +695,15 @@
       planAlpha: 0.05,
       planTargetPower: 80,
       plannerMode: PLAN_MODE_MDE_FROM_N,
+      planDirectionMode: PLAN_DIR_B_GT_A,
       planN: 10000,
       planMde: 1,
+      planPowerZoom: 1,
+      planMdeZoom: 1,
       planPowerHoverN: null,
       planMdeHoverN: null,
-      planChartBounds: null,
+      planPowerBounds: null,
+      planMdeBounds: null,
     };
 
     const ui = {
@@ -677,6 +750,7 @@
       planPowerRange: document.getElementById("planPowerRange"),
       planPowerNumber: document.getElementById("planPowerNumber"),
       plannerMode: document.getElementById("plannerMode"),
+      planDirectionMode: document.getElementById("planDirectionMode"),
       planNControl: document.getElementById("planNControl"),
       planNRange: document.getElementById("planNRange"),
       planNNumber: document.getElementById("planNNumber"),
@@ -696,8 +770,16 @@
       planInterpretation: document.getElementById("planInterpretation"),
       planPowerChart: document.getElementById("planPowerChart"),
       planPowerNote: document.getElementById("planPowerNote"),
+      planPowerZoomIn: document.getElementById("planPowerZoomIn"),
+      planPowerZoomOut: document.getElementById("planPowerZoomOut"),
+      planPowerZoomReset: document.getElementById("planPowerZoomReset"),
+      planPowerZoomLabel: document.getElementById("planPowerZoomLabel"),
       planMdeChart: document.getElementById("planMdeChart"),
       planMdeNote: document.getElementById("planMdeNote"),
+      planMdeZoomIn: document.getElementById("planMdeZoomIn"),
+      planMdeZoomOut: document.getElementById("planMdeZoomOut"),
+      planMdeZoomReset: document.getElementById("planMdeZoomReset"),
+      planMdeZoomLabel: document.getElementById("planMdeZoomLabel"),
       analysisSections: Array.from(document.querySelectorAll(".analysis-only")),
       planningSections: Array.from(document.querySelectorAll(".planning-only")),
     };
@@ -923,6 +1005,40 @@
       ui.plannerMode.value = mode;
       ui.planNControl.hidden = mode !== PLAN_MODE_MDE_FROM_N;
       ui.planMdeControl.hidden = mode !== PLAN_MODE_N_FROM_MDE;
+      const directionMode = normalizePlanDirectionMode(state.planDirectionMode);
+      state.planDirectionMode = directionMode;
+      ui.planDirectionMode.value = directionMode;
+    }
+
+    function normalizePlanDirectionMode(raw) {
+      if (raw === PLAN_DIR_B_LT_A) return PLAN_DIR_B_LT_A;
+      if (raw === PLAN_DIR_TWO_SIDED) return PLAN_DIR_TWO_SIDED;
+      return PLAN_DIR_B_GT_A;
+    }
+
+    function getDirectionModeMeta(mode) {
+      if (mode === PLAN_DIR_B_LT_A) {
+        return {
+          label: "B < A",
+          description: "односторонний B < A",
+          dir: -1,
+          twoSided: false,
+        };
+      }
+      if (mode === PLAN_DIR_TWO_SIDED) {
+        return {
+          label: "двусторонний",
+          description: "двусторонний (консервативно)",
+          dir: 0,
+          twoSided: true,
+        };
+      }
+      return {
+        label: "B > A",
+        description: "односторонний B > A",
+        dir: 1,
+        twoSided: false,
+      };
     }
 
     function syncSignificanceControl() {
@@ -1131,6 +1247,8 @@
       const mode = state.plannerMode === PLAN_MODE_N_FROM_MDE
         ? PLAN_MODE_N_FROM_MDE
         : PLAN_MODE_MDE_FROM_N;
+      const directionMode = normalizePlanDirectionMode(state.planDirectionMode);
+      const directionMeta = getDirectionModeMeta(directionMode);
       const baseRate = clamp(state.planBaseRate / 100, 0, 1);
       const alpha = state.planAlpha;
       const targetPower = clamp(state.planTargetPower / 100, 0.5, 0.9999);
@@ -1144,6 +1262,9 @@
         confidence,
         targetPower,
         z,
+        directionMode,
+        directionLabel: directionMeta.label,
+        directionDescription: directionMeta.description,
       };
 
       if (mode === PLAN_MODE_MDE_FROM_N) {
@@ -1155,6 +1276,17 @@
         const hardestDirection = Number.isFinite(mdeUp) && Number.isFinite(mdeDown)
           ? (mdeUp >= mdeDown ? 1 : -1)
           : (Number.isFinite(mdeUp) ? 1 : (Number.isFinite(mdeDown) ? -1 : 0));
+        let selectedMde = conservativeMde;
+        let selectedDirection = hardestDirection;
+        if (!directionMeta.twoSided) {
+          if (directionMeta.dir > 0) {
+            selectedMde = mdeUp;
+            selectedDirection = 1;
+          } else {
+            selectedMde = mdeDown;
+            selectedDirection = -1;
+          }
+        }
 
         return {
           ...common,
@@ -1162,9 +1294,15 @@
           mdeUp,
           mdeDown,
           conservativeMde,
+          selectedMde,
+          selectedDirection,
           hardestDirection,
+          directionFeasible: Number.isFinite(selectedMde),
           upRate: Number.isFinite(mdeUp) ? baseRate + mdeUp : null,
           downRate: Number.isFinite(mdeDown) ? baseRate - mdeDown : null,
+          selectedRate: Number.isFinite(selectedMde) && selectedDirection !== 0
+            ? baseRate + selectedDirection * selectedMde
+            : null,
         };
       }
 
@@ -1174,11 +1312,23 @@
       const nUp = upFeasible ? solveNForMde(baseRate, mdeAbs, targetPower, z, 1) : Infinity;
       const nDown = downFeasible ? solveNForMde(baseRate, mdeAbs, targetPower, z, -1) : Infinity;
       const finiteN = [nUp, nDown].filter(Number.isFinite);
-      const requiredN = finiteN.length > 0 ? Math.max(...finiteN) : Infinity;
-      const totalN = Number.isFinite(requiredN) ? requiredN * 2 : Infinity;
+      const conservativeRequiredN = finiteN.length > 0 ? Math.max(...finiteN) : Infinity;
       const hardestDirection = Number.isFinite(nUp) && Number.isFinite(nDown)
         ? (nUp >= nDown ? 1 : -1)
         : (Number.isFinite(nUp) ? 1 : (Number.isFinite(nDown) ? -1 : 0));
+      let selectedN = conservativeRequiredN;
+      let selectedDirection = hardestDirection;
+      if (!directionMeta.twoSided) {
+        if (directionMeta.dir > 0) {
+          selectedN = nUp;
+          selectedDirection = 1;
+        } else {
+          selectedN = nDown;
+          selectedDirection = -1;
+        }
+      }
+      const requiredN = selectedN;
+      const totalN = Number.isFinite(selectedN) ? selectedN * 2 : Infinity;
 
       return {
         ...common,
@@ -1187,45 +1337,68 @@
         downFeasible,
         nUp,
         nDown,
+        selectedN,
+        selectedDirection,
         requiredN,
+        conservativeRequiredN,
         totalN,
         hardestDirection,
+        directionFeasible: Number.isFinite(selectedN),
       };
     }
 
     function renderPlanningStats(stats) {
-      const hardestDirectionText = stats.hardestDirection > 0
-        ? "роста B относительно A"
-        : (stats.hardestDirection < 0 ? "снижения B относительно A" : "доступного направления");
+      const directionModeMeta = getDirectionModeMeta(stats.directionMode);
+      const selectedDirectionText = stats.selectedDirection > 0
+        ? "B > A"
+        : (stats.selectedDirection < 0 ? "B < A" : directionModeMeta.label);
 
-      ui.planInputSummary.textContent = `CR0=${fmtPct(stats.baseRate)} | alpha=${stats.alpha.toFixed(2)} | power=${fmtPower(stats.targetPower)}`;
+      ui.planInputSummary.textContent = `CR0=${fmtPct(stats.baseRate)} | alpha=${stats.alpha.toFixed(2)} | power=${fmtPower(stats.targetPower)} | ${stats.directionDescription}`;
       ui.planInputDetails.textContent = stats.mode === PLAN_MODE_MDE_FROM_N
         ? `Задан размер группы: n=${fmtN(stats.nPerGroup)}`
         : `Задан MDE: ${fmtPpAbs(stats.mdeAbs)}`;
-      ui.planInputAssumptions.textContent = "Допущения: равные группы A/B, двусторонний критерий, нормальное приближение для долей.";
+      ui.planInputAssumptions.textContent = directionModeMeta.twoSided
+        ? "Допущения: равные группы A/B, двусторонний критерий, нормальное приближение для долей."
+        : `Допущения: равные группы A/B, односторонняя цель (${directionModeMeta.label}), нормальное приближение для долей.`;
 
       if (stats.mode === PLAN_MODE_MDE_FROM_N) {
-        const upText = Number.isFinite(stats.mdeUp)
-          ? `B > A: MDE=${fmtPpAbs(stats.mdeUp)} (pB≈${fmtPct(stats.upRate)})`
-          : "B > A: в допустимых границах конверсии решение не найдено";
-        const downText = Number.isFinite(stats.mdeDown)
-          ? `B < A: MDE=${fmtPpAbs(stats.mdeDown)} (pB≈${fmtPct(stats.downRate)})`
-          : "B < A: в допустимых границах конверсии решение не найдено";
-        ui.planDirectionUp.textContent = upText;
-        ui.planDirectionDown.textContent = downText;
-        ui.planDirectionNote.textContent = "Берите большее из двух значений как консервативный MDE.";
+        if (directionModeMeta.twoSided) {
+          const upText = Number.isFinite(stats.mdeUp)
+            ? `B > A: MDE=${fmtPpAbs(stats.mdeUp)} (pB≈${fmtPct(stats.upRate)})`
+            : "B > A: в допустимых границах конверсии решение не найдено";
+          const downText = Number.isFinite(stats.mdeDown)
+            ? `B < A: MDE=${fmtPpAbs(stats.mdeDown)} (pB≈${fmtPct(stats.downRate)})`
+            : "B < A: в допустимых границах конверсии решение не найдено";
+          ui.planDirectionUp.textContent = upText;
+          ui.planDirectionDown.textContent = downText;
+          ui.planDirectionNote.textContent = "Берётся более требовательное направление (консервативно).";
+        } else {
+          const selectedLine = Number.isFinite(stats.selectedMde) && Number.isFinite(stats.selectedRate)
+            ? `Выбрано ${directionModeMeta.label}: MDE=${fmtPpAbs(stats.selectedMde)} (pB≈${fmtPct(stats.selectedRate)})`
+            : `Выбрано ${directionModeMeta.label}: в допустимых границах решение не найдено`;
+          const referenceLine = directionModeMeta.dir > 0
+            ? (Number.isFinite(stats.mdeDown)
+              ? `Справочно (B < A): MDE=${fmtPpAbs(stats.mdeDown)}`
+              : "Справочно (B < A): недоступно")
+            : (Number.isFinite(stats.mdeUp)
+              ? `Справочно (B > A): MDE=${fmtPpAbs(stats.mdeUp)}`
+              : "Справочно (B > A): недоступно");
+          ui.planDirectionUp.textContent = selectedLine;
+          ui.planDirectionDown.textContent = referenceLine;
+          ui.planDirectionNote.textContent = "В расчёт результата берётся только выбранное направление.";
+        }
 
         ui.planResultTitle.textContent = "Минимальный обнаружимый эффект (MDE)";
-        if (Number.isFinite(stats.conservativeMde)) {
-          ui.planResultMain.textContent = fmtPpAbs(stats.conservativeMde);
+        if (Number.isFinite(stats.selectedMde)) {
+          ui.planResultMain.textContent = fmtPpAbs(stats.selectedMde);
           ui.planResultDetails.textContent = `При n=${fmtN(stats.nPerGroup)} в каждой группе`;
-          ui.planResultHint.textContent = `Ограничивающее направление: для ${hardestDirectionText}.`;
-          ui.planInterpretation.textContent = `С таким размером выборки тест обычно обнаруживает разницу по модулю от ${fmtPpAbs(stats.conservativeMde)} и выше при alpha=${stats.alpha.toFixed(2)} и мощности ${fmtPower(stats.targetPower)}.`;
+          ui.planResultHint.textContent = `Направление расчёта: ${selectedDirectionText}.`;
+          ui.planInterpretation.textContent = `С таким размером выборки тест обычно обнаруживает эффект от ${fmtPpAbs(stats.selectedMde)} и выше в режиме ${stats.directionDescription}.`;
         } else {
           ui.planResultMain.textContent = "Не удалось оценить";
           ui.planResultDetails.textContent = "Проверьте входные параметры.";
           ui.planResultHint.textContent = "";
-          ui.planInterpretation.textContent = "Для этих параметров MDE не вычисляется в пределах допустимых значений конверсии.";
+          ui.planInterpretation.textContent = `Для выбранного направления (${stats.directionDescription}) MDE не вычисляется в допустимых границах конверсии.`;
         }
         return;
       }
@@ -1242,28 +1415,36 @@
         : "B < A: направление недоступно (pB < 0%)";
       ui.planDirectionUp.textContent = upNText;
       ui.planDirectionDown.textContent = downNText;
-      ui.planDirectionNote.textContent = "Консервативно берите максимум из достижимых направлений.";
+      ui.planDirectionNote.textContent = directionModeMeta.twoSided
+        ? "Берётся более требовательное направление (консервативно)."
+        : `В результате используется только выбранное направление: ${directionModeMeta.label}.`;
 
       ui.planResultTitle.textContent = "Требуемый размер выборки";
       if (Number.isFinite(stats.requiredN)) {
         ui.planResultMain.textContent = `${fmtN(stats.requiredN)} в группу`;
         ui.planResultDetails.textContent = `Итого по тесту: ${fmtN(stats.totalN)} наблюдений`;
-        ui.planResultHint.textContent = `Ограничивающее направление: для ${hardestDirectionText}.`;
-        ui.planInterpretation.textContent = `Чтобы с вероятностью ${fmtPower(stats.targetPower)} обнаружить эффект не меньше ${fmtPpAbs(stats.mdeAbs)} при alpha=${stats.alpha.toFixed(2)}, нужен размер ${fmtN(stats.requiredN)} в каждой группе.`;
+        ui.planResultHint.textContent = `Направление расчёта: ${selectedDirectionText}.`;
+        ui.planInterpretation.textContent = `Чтобы с вероятностью ${fmtPower(stats.targetPower)} обнаружить эффект не меньше ${fmtPpAbs(stats.mdeAbs)} в режиме ${stats.directionDescription}, нужен размер ${fmtN(stats.requiredN)} в каждой группе.`;
       } else {
         ui.planResultMain.textContent = "Недостижимо";
         ui.planResultDetails.textContent = "При заданном MDE требуемая выборка выходит за практический предел.";
         ui.planResultHint.textContent = "";
-        ui.planInterpretation.textContent = "Уменьшите целевую мощность, увеличьте MDE или скорректируйте базовую конверсию.";
+        ui.planInterpretation.textContent = "Уменьшите целевую мощность, увеличьте MDE или скорректируйте базовую конверсию/направление эффекта.";
       }
     }
 
-    function computePlanningNBounds(stats) {
+    function computePlanningNBounds(stats, zoomScale = 1) {
       const anchor = stats.mode === PLAN_MODE_MDE_FROM_N
         ? stats.nPerGroup
         : (Number.isFinite(stats.requiredN) ? stats.requiredN : Math.max(1000, state.planN));
-      const nMin = Math.max(100, Math.floor((anchor * 0.25) / 100) * 100);
-      const nMax = Math.max(nMin + 1000, Math.ceil((anchor * 2.5) / 100) * 100);
+      const zoom = clamp(zoomScale, 0.2, 12);
+      const baseMin = Math.max(100, Math.floor((anchor * 0.25) / 100) * 100);
+      const baseMax = Math.max(baseMin + 1000, Math.ceil((anchor * 2.5) / 100) * 100);
+      const leftSpan = Math.max(200, anchor - baseMin);
+      const rightSpan = Math.max(800, baseMax - anchor);
+      let nMin = Math.max(100, Math.round((anchor - leftSpan * zoom) / 100) * 100);
+      let nMax = Math.max(nMin + 1000, Math.round((anchor + rightSpan * zoom) / 100) * 100);
+      if (nMax - nMin < 1000) nMax = nMin + 1000;
       return { nMin, nMax, anchor };
     }
 
@@ -1284,8 +1465,9 @@
     function drawPlanningPowerChart(stats, bounds) {
       const { ctx, width, height } = resizeCanvas(ui.planPowerChart);
       ctx.clearRect(0, 0, width, height);
+      const directionModeMeta = getDirectionModeMeta(stats.directionMode);
 
-      const fallbackMde = Number.isFinite(stats.conservativeMde) ? stats.conservativeMde : 0.005;
+      const fallbackMde = Number.isFinite(stats.selectedMde) ? stats.selectedMde : 0.005;
       const effectAbs = clamp(
         stats.mode === PLAN_MODE_N_FROM_MDE ? stats.mdeAbs : fallbackMde,
         0.0001,
@@ -1300,9 +1482,16 @@
         const downRate = stats.baseRate - effectAbs;
         const upPower = upRate <= 1 ? powerForRates(stats.baseRate, upRate, n, n, stats.z) : NaN;
         const downPower = downRate >= 0 ? powerForRates(stats.baseRate, downRate, n, n, stats.z) : NaN;
-        const powers = [upPower, downPower].filter(Number.isFinite);
-        const conservativePower = powers.length === 2 ? Math.min(...powers) : (powers[0] ?? NaN);
-        points.push({ x: n, y: conservativePower });
+        let value = NaN;
+        if (directionModeMeta.twoSided) {
+          const powers = [upPower, downPower].filter(Number.isFinite);
+          value = powers.length === 2 ? Math.min(...powers) : (powers[0] ?? NaN);
+        } else if (directionModeMeta.dir > 0) {
+          value = upPower;
+        } else {
+          value = downPower;
+        }
+        points.push({ x: n, y: value });
       }
 
       const validPoints = points.filter((point) => Number.isFinite(point.y));
@@ -1352,16 +1541,17 @@
       ctx.textBaseline = "top";
       ctx.fillText("Power", axis.m.left + 2, 5);
       ctx.textAlign = "right";
-      ctx.fillText(`|Δ|=${fmtPpAbs(effectAbs)}  target=${fmtPower(stats.targetPower)}`, width - axis.m.right, 5);
+      ctx.fillText(`|Δ|=${fmtPpAbs(effectAbs)}  target=${fmtPower(stats.targetPower)}  ${stats.directionLabel}`, width - axis.m.right, 5);
 
       ui.planPowerNote.textContent = hoveredPoint
-        ? `hover: n=${fmtN(Math.round(hoveredPoint.x))}, power=${fmtPower(hoveredPoint.y)}. Линия показывает консервативную мощность (худшее из B>A и B<A) для |Δ|=${fmtPpAbs(effectAbs)}.`
-        : `Линия показывает консервативную мощность (берется худшее из направлений B>A и B<A) для фиксированного эффекта |Δ|=${fmtPpAbs(effectAbs)}.`;
+        ? `hover: n=${fmtN(Math.round(hoveredPoint.x))}, power=${fmtPower(hoveredPoint.y)}. Режим направления: ${stats.directionDescription}, эффект |Δ|=${fmtPpAbs(effectAbs)}.`
+        : `Линия показывает мощность для фиксированного эффекта |Δ|=${fmtPpAbs(effectAbs)} в режиме ${stats.directionDescription}.`;
     }
 
     function drawPlanningMdeChart(stats, bounds) {
       const { ctx, width, height } = resizeCanvas(ui.planMdeChart);
       ctx.clearRect(0, 0, width, height);
+      const directionModeMeta = getDirectionModeMeta(stats.directionMode);
 
       const sampleCount = 110;
       const points = [];
@@ -1371,10 +1561,17 @@
         const n = Math.max(2, Math.round(bounds.nMin + (i / sampleCount) * (bounds.nMax - bounds.nMin)));
         const mdeUp = solveMdeFromBaseRate(stats.baseRate, n, n, stats.targetPower, stats.z, 1);
         const mdeDown = solveMdeFromBaseRate(stats.baseRate, n, n, stats.targetPower, stats.z, -1);
-        const finite = [mdeUp, mdeDown].filter(Number.isFinite);
-        const conservativeMde = finite.length ? Math.max(...finite) : NaN;
-        if (Number.isFinite(conservativeMde)) yMax = Math.max(yMax, conservativeMde);
-        points.push({ x: n, y: conservativeMde });
+        let value = NaN;
+        if (directionModeMeta.twoSided) {
+          const finite = [mdeUp, mdeDown].filter(Number.isFinite);
+          value = finite.length ? Math.max(...finite) : NaN;
+        } else if (directionModeMeta.dir > 0) {
+          value = mdeUp;
+        } else {
+          value = mdeDown;
+        }
+        if (Number.isFinite(value)) yMax = Math.max(yMax, value);
+        points.push({ x: n, y: value });
       }
 
       const validPoints = points.filter((point) => Number.isFinite(point.y));
@@ -1429,34 +1626,50 @@
       ctx.textBaseline = "top";
       ctx.fillText("MDE", axis.m.left + 2, 5);
       ctx.textAlign = "right";
-      ctx.fillText(`power=${fmtPower(stats.targetPower)}  alpha=${stats.alpha.toFixed(2)}`, width - axis.m.right, 5);
+      ctx.fillText(`power=${fmtPower(stats.targetPower)}  alpha=${stats.alpha.toFixed(2)}  ${stats.directionLabel}`, width - axis.m.right, 5);
 
       ui.planMdeNote.textContent = hoveredPoint
-        ? `hover: n=${fmtN(Math.round(hoveredPoint.x))}, MDE=${fmtPpAbs(hoveredPoint.y)}. Кривая показывает минимальный эффект |Δ| при заданных alpha и target power.`
-        : "Кривая показывает минимальный эффект |Δ|, который можно обнаружить при заданных alpha и target power.";
+        ? `hover: n=${fmtN(Math.round(hoveredPoint.x))}, MDE=${fmtPpAbs(hoveredPoint.y)}. Режим направления: ${stats.directionDescription}.`
+        : `Кривая показывает минимальный эффект |Δ| при заданных alpha и target power в режиме ${stats.directionDescription}.`;
     }
 
     function drawPlanningCharts(stats) {
-      const bounds = computePlanningNBounds(stats);
-      state.planChartBounds = bounds;
-      drawPlanningPowerChart(stats, bounds);
-      drawPlanningMdeChart(stats, bounds);
+      const powerBounds = computePlanningNBounds(stats, state.planPowerZoom);
+      const mdeBounds = computePlanningNBounds(stats, state.planMdeZoom);
+      state.planPowerBounds = powerBounds;
+      state.planMdeBounds = mdeBounds;
+      ui.planPowerZoomLabel.textContent = `x${state.planPowerZoom.toFixed(2)}`;
+      ui.planMdeZoomLabel.textContent = `x${state.planMdeZoom.toFixed(2)}`;
+      drawPlanningPowerChart(stats, powerBounds);
+      drawPlanningMdeChart(stats, mdeBounds);
     }
 
-    function setPlanningHoverFromCanvas(canvas, key, event) {
+    function setPlanningHoverFromCanvas(canvas, boundsKey, hoverKey, event) {
       if (state.calculatorMode !== CALC_MODE_PLANNING) return;
-      if (!state.planChartBounds) return;
+      const bounds = state[boundsKey];
+      if (!bounds) return;
       const rect = canvas.getBoundingClientRect();
       if (rect.width <= 0) return;
       const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-      const nextN = state.planChartBounds.nMin + ratio * (state.planChartBounds.nMax - state.planChartBounds.nMin);
-      state[key] = nextN;
+      const nextN = bounds.nMin + ratio * (bounds.nMax - bounds.nMin);
+      state[hoverKey] = nextN;
       update();
     }
 
     function clearPlanningHover(key) {
       if (!Number.isFinite(state[key])) return;
       state[key] = null;
+      if (state.calculatorMode === CALC_MODE_PLANNING) update();
+    }
+
+    function changePlanningZoom(zoomKey, action) {
+      if (action === "reset") {
+        state[zoomKey] = 1;
+      } else if (action === "in") {
+        state[zoomKey] = clamp(state[zoomKey] * 0.75, 0.2, 12);
+      } else if (action === "out") {
+        state[zoomKey] = clamp(state[zoomKey] * 1.35, 0.2, 12);
+      }
       if (state.calculatorMode === CALC_MODE_PLANNING) update();
     }
 
@@ -2006,17 +2219,37 @@
     }
 
     ui.planPowerChart.addEventListener("mousemove", (event) => {
-      setPlanningHoverFromCanvas(ui.planPowerChart, "planPowerHoverN", event);
+      setPlanningHoverFromCanvas(ui.planPowerChart, "planPowerBounds", "planPowerHoverN", event);
     });
     ui.planPowerChart.addEventListener("mouseleave", () => {
       clearPlanningHover("planPowerHoverN");
     });
 
     ui.planMdeChart.addEventListener("mousemove", (event) => {
-      setPlanningHoverFromCanvas(ui.planMdeChart, "planMdeHoverN", event);
+      setPlanningHoverFromCanvas(ui.planMdeChart, "planMdeBounds", "planMdeHoverN", event);
     });
     ui.planMdeChart.addEventListener("mouseleave", () => {
       clearPlanningHover("planMdeHoverN");
+    });
+
+    ui.planPowerZoomIn.addEventListener("click", () => {
+      changePlanningZoom("planPowerZoom", "in");
+    });
+    ui.planPowerZoomOut.addEventListener("click", () => {
+      changePlanningZoom("planPowerZoom", "out");
+    });
+    ui.planPowerZoomReset.addEventListener("click", () => {
+      changePlanningZoom("planPowerZoom", "reset");
+    });
+
+    ui.planMdeZoomIn.addEventListener("click", () => {
+      changePlanningZoom("planMdeZoom", "in");
+    });
+    ui.planMdeZoomOut.addEventListener("click", () => {
+      changePlanningZoom("planMdeZoom", "out");
+    });
+    ui.planMdeZoomReset.addEventListener("click", () => {
+      changePlanningZoom("planMdeZoom", "reset");
     });
 
     ui.planAlpha.addEventListener("input", (event) => {
@@ -2031,12 +2264,18 @@
       update();
     });
 
+    ui.planDirectionMode.addEventListener("input", (event) => {
+      state.planDirectionMode = normalizePlanDirectionMode(event.target.value);
+      update();
+    });
+
     state.calculatorMode = CALC_MODE_ANALYSIS;
     state.mode = ui.inferenceMode.value === MODE_Z_TEST ? MODE_Z_TEST : MODE_CI;
     state.zVisualMode = ui.zVisualMode.value === Z_VISUAL_POWER ? Z_VISUAL_POWER : Z_VISUAL_H0;
     state.plannerMode = ui.plannerMode.value === PLAN_MODE_N_FROM_MDE
       ? PLAN_MODE_N_FROM_MDE
       : PLAN_MODE_MDE_FROM_N;
+    state.planDirectionMode = normalizePlanDirectionMode(ui.planDirectionMode.value);
     setPlanAlpha(Number(ui.planAlpha.value));
     syncPlannerInputControls();
     if (state.mode === MODE_Z_TEST) {
