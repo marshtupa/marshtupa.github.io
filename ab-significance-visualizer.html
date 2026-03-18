@@ -27,6 +27,10 @@
       box-sizing: border-box;
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     body {
       margin: 0;
       min-height: 100vh;
@@ -65,6 +69,59 @@
       margin: 0;
       font-size: clamp(1.25rem, 1rem + 1.2vw, 2rem);
       letter-spacing: 0.02em;
+    }
+
+    .hero-mode {
+      margin-top: 12px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .mode-toggle {
+      --mode-index: 0;
+      position: relative;
+      width: min(640px, 100%);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(18, 32, 40, 0.16);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+      overflow: hidden;
+    }
+
+    .mode-toggle-thumb {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: calc(50% - 4px);
+      height: calc(100% - 8px);
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(27, 127, 142, 0.2), rgba(15, 95, 82, 0.24));
+      border: 1px solid rgba(15, 95, 82, 0.18);
+      transition: transform 220ms ease;
+      transform: translateX(calc(var(--mode-index) * 100%));
+      pointer-events: none;
+    }
+
+    .mode-toggle-btn {
+      position: relative;
+      z-index: 1;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: color 160ms ease;
+    }
+
+    .mode-toggle-btn.active {
+      color: var(--text);
     }
 
     .controls {
@@ -198,6 +255,11 @@
         linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(249, 251, 251, 0.9));
     }
 
+    #planPowerChart,
+    #planMdeChart {
+      cursor: crosshair;
+    }
+
     .explanation {
       border: 1px dashed rgba(18, 32, 40, 0.22);
       border-radius: 10px;
@@ -262,9 +324,16 @@
   <main class="app">
     <section class="hero">
       <h1>Визуальный калькулятор статистической значимости для A/B</h1>
+      <div class="hero-mode">
+        <div id="calculatorModeToggle" class="mode-toggle" role="tablist" aria-label="Основной режим">
+          <span id="modeToggleThumb" class="mode-toggle-thumb" aria-hidden="true"></span>
+          <button id="modeBtnAnalysis" type="button" class="mode-toggle-btn active" data-mode="analysis" aria-pressed="true">Анализ результата A/B</button>
+          <button id="modeBtnPlanning" type="button" class="mode-toggle-btn" data-mode="planning" aria-pressed="false">Планирование теста</button>
+        </div>
+      </div>
     </section>
 
-    <section class="controls">
+    <section class="controls analysis-only">
 
       <div class="control">
         <label for="n1Range">Размер выборки A, n</label>
@@ -320,7 +389,7 @@
       </div>
     </section>
 
-    <section class="stats">
+    <section class="stats analysis-only">
       <article class="stat">
         <h3>Группа A</h3>
         <div id="meanA" class="main mono"></div>
@@ -349,7 +418,7 @@
       </article>
     </section>
 
-    <section class="panel">
+    <section class="panel analysis-only">
       <h2>Распределения конверсии A и B</h2>
       <div class="legend">
         <span><span class="dot a"></span><span id="convLegendAText">кривая A + 95% CI</span></span>
@@ -358,14 +427,109 @@
       <canvas id="conversionsChart"></canvas>
     </section>
 
-    <section class="panel">
+    <section class="panel analysis-only">
       <h2 id="differenceTitle">Распределение разницы (A - B)</h2>
       <div class="legend">
-        <span><span class="dot d"></span><span id="differenceLegendPrimary">кривая разницы + 95% CI</span></span>
-        <span><span class="dot zero"></span><span id="differenceLegendSecondary">линия нуля</span></span>
+        <span><span id="differenceLegendPrimaryDot" class="dot d"></span><span id="differenceLegendPrimary">кривая разницы + 95% CI</span></span>
+        <span><span id="differenceLegendSecondaryDot" class="dot zero"></span><span id="differenceLegendSecondary">линия нуля</span></span>
       </div>
       <canvas id="differenceChart"></canvas>
       <div id="differenceExplanation" class="explanation muted"></div>
+    </section>
+
+    <section class="controls planning-only" hidden>
+      <div class="control">
+        <label for="planBaseRateRange">Базовая конверсия (контроль), %</label>
+        <div class="row">
+          <input id="planBaseRateRange" type="range" min="0" max="100" step="0.01" value="5" />
+          <input id="planBaseRateNumber" type="number" min="0" max="100" step="0.01" value="5" />
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="planAlpha">Уровень значимости alpha</label>
+        <div class="row single">
+          <select id="planAlpha">
+            <option value="0.1">alpha=0.10</option>
+            <option value="0.05" selected>alpha=0.05</option>
+            <option value="0.01">alpha=0.01</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="planPowerRange">Целевая мощность, %</label>
+        <div class="row">
+          <input id="planPowerRange" type="range" min="50" max="99.9" step="0.1" value="80" />
+          <input id="planPowerNumber" type="number" min="50" max="99.9" step="0.1" value="80" />
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="plannerMode">Что считаем</label>
+        <div class="row single">
+          <select id="plannerMode">
+            <option value="mde_from_n" selected>MDE по заданному n</option>
+            <option value="n_from_mde">n по заданному MDE</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="planNControl" class="control">
+        <label for="planNRange">Размер выборки в группе, n</label>
+        <div class="row">
+          <input id="planNRange" type="range" min="100" max="5000000" step="100" value="10000" />
+          <input id="planNNumber" type="number" min="100" max="5000000" step="100" value="10000" />
+        </div>
+      </div>
+
+      <div id="planMdeControl" class="control" hidden>
+        <label for="planMdeRange">Желаемый MDE, п.п.</label>
+        <div class="row">
+          <input id="planMdeRange" type="range" min="0.01" max="50" step="0.01" value="1" />
+          <input id="planMdeNumber" type="number" min="0.01" max="50" step="0.01" value="1" />
+        </div>
+      </div>
+    </section>
+
+    <section class="stats planning-only" hidden>
+      <article class="stat">
+        <h3>Входные параметры</h3>
+        <div id="planInputSummary" class="main mono"></div>
+        <div id="planInputDetails" class="mono"></div>
+        <div id="planInputAssumptions" class="muted"></div>
+      </article>
+
+      <article class="stat">
+        <h3 id="planResultTitle">Результат</h3>
+        <div id="planResultMain" class="main mono"></div>
+        <div id="planResultDetails" class="mono"></div>
+        <div id="planResultHint" class="muted"></div>
+      </article>
+
+      <article class="stat">
+        <h3>Направления эффекта</h3>
+        <div id="planDirectionUp" class="mono"></div>
+        <div id="planDirectionDown" class="mono"></div>
+        <div id="planDirectionNote" class="muted"></div>
+      </article>
+
+      <article class="stat">
+        <h3>Интерпретация</h3>
+        <div id="planInterpretation" class="muted"></div>
+      </article>
+    </section>
+
+    <section class="panel planning-only" hidden>
+      <h2>Мощность от размера выборки (Power vs n)</h2>
+      <canvas id="planPowerChart"></canvas>
+      <div id="planPowerNote" class="muted"></div>
+    </section>
+
+    <section class="panel planning-only" hidden>
+      <h2>Минимальный эффект от размера выборки (MDE vs n)</h2>
+      <canvas id="planMdeChart"></canvas>
+      <div id="planMdeNote" class="muted"></div>
     </section>
 
   </main>
@@ -380,8 +544,14 @@
     const ALPHA_LEVELS = [0.1, 0.05, 0.01];
     const MODE_CI = "ci";
     const MODE_Z_TEST = "ztest";
+    const CALC_MODE_ANALYSIS = "analysis";
+    const CALC_MODE_PLANNING = "planning";
+    const PLAN_MODE_MDE_FROM_N = "mde_from_n";
+    const PLAN_MODE_N_FROM_MDE = "n_from_mde";
+    const MAX_SOLVER_N = 2000000000;
 
     const state = {
+      calculatorMode: CALC_MODE_ANALYSIS,
       p1: 5,
       n1: 10000,
       p2: 6,
@@ -389,9 +559,21 @@
       confidence: 95,
       alpha: 0.05,
       mode: MODE_CI,
+      planBaseRate: 5,
+      planAlpha: 0.05,
+      planTargetPower: 80,
+      plannerMode: PLAN_MODE_MDE_FROM_N,
+      planN: 10000,
+      planMde: 1,
+      planPowerHoverN: null,
+      planMdeHoverN: null,
+      planChartBounds: null,
     };
 
     const ui = {
+      calculatorModeToggle: document.getElementById("calculatorModeToggle"),
+      modeBtnAnalysis: document.getElementById("modeBtnAnalysis"),
+      modeBtnPlanning: document.getElementById("modeBtnPlanning"),
       p1Range: document.getElementById("p1Range"),
       p1Number: document.getElementById("p1Number"),
       n1Range: document.getElementById("n1Range"),
@@ -417,11 +599,42 @@
       convLegendAText: document.getElementById("convLegendAText"),
       convLegendBText: document.getElementById("convLegendBText"),
       differenceTitle: document.getElementById("differenceTitle"),
+      differenceLegendPrimaryDot: document.getElementById("differenceLegendPrimaryDot"),
       differenceLegendPrimary: document.getElementById("differenceLegendPrimary"),
+      differenceLegendSecondaryDot: document.getElementById("differenceLegendSecondaryDot"),
       differenceLegendSecondary: document.getElementById("differenceLegendSecondary"),
       differenceExplanation: document.getElementById("differenceExplanation"),
       conversionsChart: document.getElementById("conversionsChart"),
       differenceChart: document.getElementById("differenceChart"),
+      planBaseRateRange: document.getElementById("planBaseRateRange"),
+      planBaseRateNumber: document.getElementById("planBaseRateNumber"),
+      planAlpha: document.getElementById("planAlpha"),
+      planPowerRange: document.getElementById("planPowerRange"),
+      planPowerNumber: document.getElementById("planPowerNumber"),
+      plannerMode: document.getElementById("plannerMode"),
+      planNControl: document.getElementById("planNControl"),
+      planNRange: document.getElementById("planNRange"),
+      planNNumber: document.getElementById("planNNumber"),
+      planMdeControl: document.getElementById("planMdeControl"),
+      planMdeRange: document.getElementById("planMdeRange"),
+      planMdeNumber: document.getElementById("planMdeNumber"),
+      planInputSummary: document.getElementById("planInputSummary"),
+      planInputDetails: document.getElementById("planInputDetails"),
+      planInputAssumptions: document.getElementById("planInputAssumptions"),
+      planResultTitle: document.getElementById("planResultTitle"),
+      planResultMain: document.getElementById("planResultMain"),
+      planResultDetails: document.getElementById("planResultDetails"),
+      planResultHint: document.getElementById("planResultHint"),
+      planDirectionUp: document.getElementById("planDirectionUp"),
+      planDirectionDown: document.getElementById("planDirectionDown"),
+      planDirectionNote: document.getElementById("planDirectionNote"),
+      planInterpretation: document.getElementById("planInterpretation"),
+      planPowerChart: document.getElementById("planPowerChart"),
+      planPowerNote: document.getElementById("planPowerNote"),
+      planMdeChart: document.getElementById("planMdeChart"),
+      planMdeNote: document.getElementById("planMdeNote"),
+      analysisSections: Array.from(document.querySelectorAll(".analysis-only")),
+      planningSections: Array.from(document.querySelectorAll(".planning-only")),
     };
 
     function clamp(value, min, max) {
@@ -453,6 +666,75 @@
       return 0.5 * (1 + erf(x / Math.SQRT2));
     }
 
+    function twoSidedPower(delta, zCritical) {
+      if (!Number.isFinite(delta) || !Number.isFinite(zCritical)) return 0;
+      return clamp((1 - normalCdf(zCritical - delta)) + normalCdf(-zCritical - delta), 0, 1);
+    }
+
+    function seDiffForRates(pA, pB, nA, nB) {
+      return Math.sqrt(Math.max((pA * (1 - pA)) / nA + (pB * (1 - pB)) / nB, 0));
+    }
+
+    function powerForRates(pA, pB, nA, nB, zCritical) {
+      const seDiff = seDiffForRates(pA, pB, nA, nB);
+      const diffAbs = Math.abs(pA - pB);
+      if (seDiff > 0) return twoSidedPower(diffAbs / seDiff, zCritical);
+      if (diffAbs > Number.EPSILON) return 1;
+      return 0;
+    }
+
+    function solveMdeFromBaseRate(baseRate, nA, nB, targetPower, zCritical, direction) {
+      if (![baseRate, nA, nB, targetPower, zCritical, direction].every(Number.isFinite)) return Infinity;
+      const clippedTarget = clamp(targetPower, 0, 0.999999);
+      const dir = direction >= 0 ? 1 : -1;
+      const maxEffect = dir > 0 ? 1 - baseRate : baseRate;
+      if (maxEffect <= 0) return Infinity;
+
+      const maxPower = powerForRates(baseRate, baseRate + dir * maxEffect, nA, nB, zCritical);
+      if (maxPower < clippedTarget) return Infinity;
+
+      let lo = 0;
+      let hi = maxEffect;
+      for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        const candidatePower = powerForRates(baseRate, baseRate + dir * mid, nA, nB, zCritical);
+        if (candidatePower < clippedTarget) lo = mid;
+        else hi = mid;
+      }
+      return hi;
+    }
+
+    function solveNForMde(baseRate, mdeAbs, targetPower, zCritical, direction) {
+      if (![baseRate, mdeAbs, targetPower, zCritical, direction].every(Number.isFinite)) return Infinity;
+      const clippedTarget = clamp(targetPower, 0, 0.999999);
+      const effect = Math.abs(mdeAbs);
+      if (effect <= 0) return 2;
+
+      const dir = direction >= 0 ? 1 : -1;
+      const candidateRate = baseRate + dir * effect;
+      if (candidateRate < 0 || candidateRate > 1) return Infinity;
+
+      const hasEnoughPower = (n) => powerForRates(baseRate, candidateRate, n, n, zCritical) >= clippedTarget;
+
+      let lo = 2;
+      let hi = 2;
+      if (hasEnoughPower(hi)) return hi;
+
+      while (!hasEnoughPower(hi) && hi < MAX_SOLVER_N) {
+        lo = hi;
+        hi = Math.min(MAX_SOLVER_N, hi * 2);
+      }
+
+      if (!hasEnoughPower(hi)) return Infinity;
+
+      while (hi - lo > 1) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (hasEnoughPower(mid)) hi = mid;
+        else lo = mid;
+      }
+      return hi;
+    }
+
     function fmtPct(value, digits = 3) {
       return `${(value * 100).toFixed(digits)}%`;
     }
@@ -481,6 +763,13 @@
       return value > 0 ? "+inf" : "-inf";
     }
 
+    function fmtPower(value) {
+      return `${new Intl.NumberFormat("ru-RU", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      }).format(value * 100)}%`;
+    }
+
     function findNearest(list, target) {
       let best = list[0];
       let bestDist = Math.abs(target - best);
@@ -504,6 +793,42 @@
       const valid = findNearest(ALPHA_LEVELS, alpha);
       state.alpha = valid;
       state.confidence = Math.round((1 - valid) * 100);
+    }
+
+    function setPlanAlpha(alpha) {
+      const valid = findNearest(ALPHA_LEVELS, alpha);
+      state.planAlpha = valid;
+      ui.planAlpha.value = String(valid);
+    }
+
+    function syncCalculatorMode() {
+      const isPlanning = state.calculatorMode === CALC_MODE_PLANNING;
+      for (const section of ui.analysisSections) {
+        section.hidden = isPlanning;
+      }
+      for (const section of ui.planningSections) {
+        section.hidden = !isPlanning;
+      }
+      syncModeToggle();
+    }
+
+    function syncModeToggle() {
+      const isPlanning = state.calculatorMode === CALC_MODE_PLANNING;
+      ui.calculatorModeToggle.style.setProperty("--mode-index", isPlanning ? "1" : "0");
+      ui.modeBtnAnalysis.classList.toggle("active", !isPlanning);
+      ui.modeBtnPlanning.classList.toggle("active", isPlanning);
+      ui.modeBtnAnalysis.setAttribute("aria-pressed", (!isPlanning).toString());
+      ui.modeBtnPlanning.setAttribute("aria-pressed", isPlanning.toString());
+    }
+
+    function syncPlannerInputControls() {
+      const mode = state.plannerMode === PLAN_MODE_N_FROM_MDE
+        ? PLAN_MODE_N_FROM_MDE
+        : PLAN_MODE_MDE_FROM_N;
+      state.plannerMode = mode;
+      ui.plannerMode.value = mode;
+      ui.planNControl.hidden = mode !== PLAN_MODE_MDE_FROM_N;
+      ui.planMdeControl.hidden = mode !== PLAN_MODE_N_FROM_MDE;
     }
 
     function syncSignificanceControl() {
@@ -537,10 +862,14 @@
         ui.differenceTitle.textContent = "Z-распределение для проверки H0";
         ui.differenceLegendPrimary.textContent = "N(0,1) + критические области";
         ui.differenceLegendSecondary.textContent = "границы ±z* и наблюдаемое z";
+        ui.differenceLegendPrimaryDot.className = "dot d";
+        ui.differenceLegendSecondaryDot.className = "dot zero";
       } else {
         ui.differenceTitle.textContent = "Распределение разницы (A - B)";
         ui.differenceLegendPrimary.textContent = `кривая разницы + ${confLabel} CI`;
         ui.differenceLegendSecondary.textContent = "линия нуля";
+        ui.differenceLegendPrimaryDot.className = "dot d";
+        ui.differenceLegendSecondaryDot.className = "dot zero";
       }
     }
 
@@ -596,7 +925,7 @@
       const ciB = [pB - z * seB, pB + z * seB];
 
       const diff = pA - pB;
-      const seDiff = Math.sqrt(Math.max((pA * (1 - pA)) / nA + (pB * (1 - pB)) / nB, 0));
+      const seDiff = seDiffForRates(pA, pB, nA, nB);
       const ciDiff = [diff - z * seDiff, diff + z * seDiff];
 
       let zScore = 0;
@@ -636,6 +965,339 @@
         convA: Math.round(pA * nA),
         convB: Math.round(pB * nB),
       };
+    }
+
+    function computePlanningStats() {
+      const mode = state.plannerMode === PLAN_MODE_N_FROM_MDE
+        ? PLAN_MODE_N_FROM_MDE
+        : PLAN_MODE_MDE_FROM_N;
+      const baseRate = clamp(state.planBaseRate / 100, 0, 1);
+      const alpha = state.planAlpha;
+      const targetPower = clamp(state.planTargetPower / 100, 0.5, 0.9999);
+      const confidence = Math.round((1 - alpha) * 100);
+      const z = Z_BY_CONF[confidence] || Z_BY_CONF[95];
+
+      const common = {
+        mode,
+        baseRate,
+        alpha,
+        confidence,
+        targetPower,
+        z,
+      };
+
+      if (mode === PLAN_MODE_MDE_FROM_N) {
+        const nPerGroup = Math.max(2, Math.round(state.planN));
+        const mdeUp = solveMdeFromBaseRate(baseRate, nPerGroup, nPerGroup, targetPower, z, 1);
+        const mdeDown = solveMdeFromBaseRate(baseRate, nPerGroup, nPerGroup, targetPower, z, -1);
+        const finiteMde = [mdeUp, mdeDown].filter(Number.isFinite);
+        const conservativeMde = finiteMde.length > 0 ? Math.max(...finiteMde) : Infinity;
+        const hardestDirection = Number.isFinite(mdeUp) && Number.isFinite(mdeDown)
+          ? (mdeUp >= mdeDown ? 1 : -1)
+          : (Number.isFinite(mdeUp) ? 1 : (Number.isFinite(mdeDown) ? -1 : 0));
+
+        return {
+          ...common,
+          nPerGroup,
+          mdeUp,
+          mdeDown,
+          conservativeMde,
+          hardestDirection,
+          upRate: Number.isFinite(mdeUp) ? baseRate + mdeUp : null,
+          downRate: Number.isFinite(mdeDown) ? baseRate - mdeDown : null,
+        };
+      }
+
+      const mdeAbs = Math.abs(state.planMde) / 100;
+      const upFeasible = baseRate + mdeAbs <= 1;
+      const downFeasible = baseRate - mdeAbs >= 0;
+      const nUp = upFeasible ? solveNForMde(baseRate, mdeAbs, targetPower, z, 1) : Infinity;
+      const nDown = downFeasible ? solveNForMde(baseRate, mdeAbs, targetPower, z, -1) : Infinity;
+      const finiteN = [nUp, nDown].filter(Number.isFinite);
+      const requiredN = finiteN.length > 0 ? Math.max(...finiteN) : Infinity;
+      const totalN = Number.isFinite(requiredN) ? requiredN * 2 : Infinity;
+      const hardestDirection = Number.isFinite(nUp) && Number.isFinite(nDown)
+        ? (nUp >= nDown ? 1 : -1)
+        : (Number.isFinite(nUp) ? 1 : (Number.isFinite(nDown) ? -1 : 0));
+
+      return {
+        ...common,
+        mdeAbs,
+        upFeasible,
+        downFeasible,
+        nUp,
+        nDown,
+        requiredN,
+        totalN,
+        hardestDirection,
+      };
+    }
+
+    function renderPlanningStats(stats) {
+      const hardestDirectionText = stats.hardestDirection > 0
+        ? "роста B относительно A"
+        : (stats.hardestDirection < 0 ? "снижения B относительно A" : "доступного направления");
+
+      ui.planInputSummary.textContent = `CR0=${fmtPct(stats.baseRate)} | alpha=${stats.alpha.toFixed(2)} | power=${fmtPower(stats.targetPower)}`;
+      ui.planInputDetails.textContent = stats.mode === PLAN_MODE_MDE_FROM_N
+        ? `Задан размер группы: n=${fmtN(stats.nPerGroup)}`
+        : `Задан MDE: ${fmtPpAbs(stats.mdeAbs)}`;
+      ui.planInputAssumptions.textContent = "Допущения: равные группы A/B, двусторонний критерий, нормальное приближение для долей.";
+
+      if (stats.mode === PLAN_MODE_MDE_FROM_N) {
+        const upText = Number.isFinite(stats.mdeUp)
+          ? `B > A: MDE=${fmtPpAbs(stats.mdeUp)} (pB≈${fmtPct(stats.upRate)})`
+          : "B > A: в допустимых границах конверсии решение не найдено";
+        const downText = Number.isFinite(stats.mdeDown)
+          ? `B < A: MDE=${fmtPpAbs(stats.mdeDown)} (pB≈${fmtPct(stats.downRate)})`
+          : "B < A: в допустимых границах конверсии решение не найдено";
+        ui.planDirectionUp.textContent = upText;
+        ui.planDirectionDown.textContent = downText;
+        ui.planDirectionNote.textContent = "Берите большее из двух значений как консервативный MDE.";
+
+        ui.planResultTitle.textContent = "Минимальный обнаружимый эффект (MDE)";
+        if (Number.isFinite(stats.conservativeMde)) {
+          ui.planResultMain.textContent = fmtPpAbs(stats.conservativeMde);
+          ui.planResultDetails.textContent = `При n=${fmtN(stats.nPerGroup)} в каждой группе`;
+          ui.planResultHint.textContent = `Ограничивающее направление: для ${hardestDirectionText}.`;
+          ui.planInterpretation.textContent = `С таким размером выборки тест обычно обнаруживает разницу по модулю от ${fmtPpAbs(stats.conservativeMde)} и выше при alpha=${stats.alpha.toFixed(2)} и мощности ${fmtPower(stats.targetPower)}.`;
+        } else {
+          ui.planResultMain.textContent = "Не удалось оценить";
+          ui.planResultDetails.textContent = "Проверьте входные параметры.";
+          ui.planResultHint.textContent = "";
+          ui.planInterpretation.textContent = "Для этих параметров MDE не вычисляется в пределах допустимых значений конверсии.";
+        }
+        return;
+      }
+
+      const upNText = stats.upFeasible
+        ? (Number.isFinite(stats.nUp)
+          ? `B > A: нужно n=${fmtN(stats.nUp)} в группу`
+          : "B > A: требуемый n слишком большой")
+        : "B > A: направление недоступно (pB > 100%)";
+      const downNText = stats.downFeasible
+        ? (Number.isFinite(stats.nDown)
+          ? `B < A: нужно n=${fmtN(stats.nDown)} в группу`
+          : "B < A: требуемый n слишком большой")
+        : "B < A: направление недоступно (pB < 0%)";
+      ui.planDirectionUp.textContent = upNText;
+      ui.planDirectionDown.textContent = downNText;
+      ui.planDirectionNote.textContent = "Консервативно берите максимум из достижимых направлений.";
+
+      ui.planResultTitle.textContent = "Требуемый размер выборки";
+      if (Number.isFinite(stats.requiredN)) {
+        ui.planResultMain.textContent = `${fmtN(stats.requiredN)} в группу`;
+        ui.planResultDetails.textContent = `Итого по тесту: ${fmtN(stats.totalN)} наблюдений`;
+        ui.planResultHint.textContent = `Ограничивающее направление: для ${hardestDirectionText}.`;
+        ui.planInterpretation.textContent = `Чтобы с вероятностью ${fmtPower(stats.targetPower)} обнаружить эффект не меньше ${fmtPpAbs(stats.mdeAbs)} при alpha=${stats.alpha.toFixed(2)}, нужен размер ${fmtN(stats.requiredN)} в каждой группе.`;
+      } else {
+        ui.planResultMain.textContent = "Недостижимо";
+        ui.planResultDetails.textContent = "При заданном MDE требуемая выборка выходит за практический предел.";
+        ui.planResultHint.textContent = "";
+        ui.planInterpretation.textContent = "Уменьшите целевую мощность, увеличьте MDE или скорректируйте базовую конверсию.";
+      }
+    }
+
+    function computePlanningNBounds(stats) {
+      const anchor = stats.mode === PLAN_MODE_MDE_FROM_N
+        ? stats.nPerGroup
+        : (Number.isFinite(stats.requiredN) ? stats.requiredN : Math.max(1000, state.planN));
+      const nMin = Math.max(100, Math.floor((anchor * 0.25) / 100) * 100);
+      const nMax = Math.max(nMin + 1000, Math.ceil((anchor * 2.5) / 100) * 100);
+      return { nMin, nMax, anchor };
+    }
+
+    function findNearestPointByX(points, xValue) {
+      if (!points.length || !Number.isFinite(xValue)) return null;
+      let best = points[0];
+      let bestDist = Math.abs(points[0].x - xValue);
+      for (let i = 1; i < points.length; i++) {
+        const dist = Math.abs(points[i].x - xValue);
+        if (dist < bestDist) {
+          best = points[i];
+          bestDist = dist;
+        }
+      }
+      return best;
+    }
+
+    function drawPlanningPowerChart(stats, bounds) {
+      const { ctx, width, height } = resizeCanvas(ui.planPowerChart);
+      ctx.clearRect(0, 0, width, height);
+
+      const fallbackMde = Number.isFinite(stats.conservativeMde) ? stats.conservativeMde : 0.005;
+      const effectAbs = clamp(
+        stats.mode === PLAN_MODE_N_FROM_MDE ? stats.mdeAbs : fallbackMde,
+        0.0001,
+        0.9
+      );
+
+      const sampleCount = 140;
+      const points = [];
+      for (let i = 0; i <= sampleCount; i++) {
+        const n = Math.max(2, Math.round(bounds.nMin + (i / sampleCount) * (bounds.nMax - bounds.nMin)));
+        const upRate = stats.baseRate + effectAbs;
+        const downRate = stats.baseRate - effectAbs;
+        const upPower = upRate <= 1 ? powerForRates(stats.baseRate, upRate, n, n, stats.z) : NaN;
+        const downPower = downRate >= 0 ? powerForRates(stats.baseRate, downRate, n, n, stats.z) : NaN;
+        const powers = [upPower, downPower].filter(Number.isFinite);
+        const conservativePower = powers.length === 2 ? Math.min(...powers) : (powers[0] ?? NaN);
+        points.push({ x: n, y: conservativePower });
+      }
+
+      const validPoints = points.filter((point) => Number.isFinite(point.y));
+      const axis = drawAxes(ctx, width, height, bounds.nMin, bounds.nMax, (value) => fmtN(Math.round(value)));
+      const yToPx = (y) => axis.m.top + axis.plotH - clamp(y, 0, 1) * axis.plotH;
+      const hoveredPoint = findNearestPointByX(validPoints, state.planPowerHoverN);
+
+      if (validPoints.length) {
+        drawFilledCurve(ctx, validPoints, axis.xToPx, yToPx, axis.baselineY, "rgba(27, 127, 142, 0.14)");
+        drawCurveLine(ctx, validPoints, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--a"), 2.4);
+      }
+
+      const targetY = yToPx(stats.targetPower);
+      ctx.setLineDash([6, 5]);
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = "rgba(196, 70, 47, 0.85)";
+      ctx.beginPath();
+      ctx.moveTo(axis.m.left, targetY);
+      ctx.lineTo(axis.m.left + axis.plotW, targetY);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(15, 95, 82, 0.72)";
+      ctx.beginPath();
+      ctx.moveTo(axis.xToPx(bounds.anchor), axis.m.top);
+      ctx.lineTo(axis.xToPx(bounds.anchor), axis.baselineY);
+      ctx.stroke();
+
+      if (hoveredPoint) {
+        ctx.strokeStyle = "rgba(18, 32, 40, 0.56)";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(axis.xToPx(hoveredPoint.x), axis.m.top);
+        ctx.lineTo(axis.xToPx(hoveredPoint.x), axis.baselineY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = "rgba(27, 127, 142, 0.95)";
+        ctx.beginPath();
+        ctx.arc(axis.xToPx(hoveredPoint.x), yToPx(hoveredPoint.y), 4.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "rgba(18, 32, 40, 0.72)";
+      ctx.font = '12px "Avenir Next", "Trebuchet MS", sans-serif';
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("Power", axis.m.left + 2, 5);
+      ctx.textAlign = "right";
+      ctx.fillText(`|Δ|=${fmtPpAbs(effectAbs)}  target=${fmtPower(stats.targetPower)}`, width - axis.m.right, 5);
+
+      ui.planPowerNote.textContent = hoveredPoint
+        ? `hover: n=${fmtN(Math.round(hoveredPoint.x))}, power=${fmtPower(hoveredPoint.y)}. Линия показывает консервативную мощность (худшее из B>A и B<A) для |Δ|=${fmtPpAbs(effectAbs)}.`
+        : `Линия показывает консервативную мощность (берется худшее из направлений B>A и B<A) для фиксированного эффекта |Δ|=${fmtPpAbs(effectAbs)}.`;
+    }
+
+    function drawPlanningMdeChart(stats, bounds) {
+      const { ctx, width, height } = resizeCanvas(ui.planMdeChart);
+      ctx.clearRect(0, 0, width, height);
+
+      const sampleCount = 110;
+      const points = [];
+      let yMax = 0;
+
+      for (let i = 0; i <= sampleCount; i++) {
+        const n = Math.max(2, Math.round(bounds.nMin + (i / sampleCount) * (bounds.nMax - bounds.nMin)));
+        const mdeUp = solveMdeFromBaseRate(stats.baseRate, n, n, stats.targetPower, stats.z, 1);
+        const mdeDown = solveMdeFromBaseRate(stats.baseRate, n, n, stats.targetPower, stats.z, -1);
+        const finite = [mdeUp, mdeDown].filter(Number.isFinite);
+        const conservativeMde = finite.length ? Math.max(...finite) : NaN;
+        if (Number.isFinite(conservativeMde)) yMax = Math.max(yMax, conservativeMde);
+        points.push({ x: n, y: conservativeMde });
+      }
+
+      const validPoints = points.filter((point) => Number.isFinite(point.y));
+      yMax = Math.max(yMax * 1.08, 0.01);
+      const axis = drawAxes(ctx, width, height, bounds.nMin, bounds.nMax, (value) => fmtN(Math.round(value)));
+      const yToPx = (y) => axis.m.top + axis.plotH - (clamp(y, 0, yMax) / yMax) * axis.plotH;
+      const hoveredPoint = findNearestPointByX(validPoints, state.planMdeHoverN);
+
+      if (validPoints.length) {
+        drawFilledCurve(ctx, validPoints, axis.xToPx, yToPx, axis.baselineY, "rgba(221, 122, 47, 0.16)");
+        drawCurveLine(ctx, validPoints, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--b"), 2.4);
+      }
+
+      if (stats.mode === PLAN_MODE_N_FROM_MDE && Number.isFinite(stats.mdeAbs)) {
+        ctx.setLineDash([6, 5]);
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = "rgba(196, 70, 47, 0.85)";
+        ctx.beginPath();
+        ctx.moveTo(axis.m.left, yToPx(stats.mdeAbs));
+        ctx.lineTo(axis.m.left + axis.plotW, yToPx(stats.mdeAbs));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.strokeStyle = "rgba(15, 95, 82, 0.72)";
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(axis.xToPx(bounds.anchor), axis.m.top);
+      ctx.lineTo(axis.xToPx(bounds.anchor), axis.baselineY);
+      ctx.stroke();
+
+      if (hoveredPoint) {
+        ctx.strokeStyle = "rgba(18, 32, 40, 0.56)";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(axis.xToPx(hoveredPoint.x), axis.m.top);
+        ctx.lineTo(axis.xToPx(hoveredPoint.x), axis.baselineY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = "rgba(221, 122, 47, 0.95)";
+        ctx.beginPath();
+        ctx.arc(axis.xToPx(hoveredPoint.x), yToPx(hoveredPoint.y), 4.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "rgba(18, 32, 40, 0.72)";
+      ctx.font = '12px "Avenir Next", "Trebuchet MS", sans-serif';
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("MDE", axis.m.left + 2, 5);
+      ctx.textAlign = "right";
+      ctx.fillText(`power=${fmtPower(stats.targetPower)}  alpha=${stats.alpha.toFixed(2)}`, width - axis.m.right, 5);
+
+      ui.planMdeNote.textContent = hoveredPoint
+        ? `hover: n=${fmtN(Math.round(hoveredPoint.x))}, MDE=${fmtPpAbs(hoveredPoint.y)}. Кривая показывает минимальный эффект |Δ| при заданных alpha и target power.`
+        : "Кривая показывает минимальный эффект |Δ|, который можно обнаружить при заданных alpha и target power.";
+    }
+
+    function drawPlanningCharts(stats) {
+      const bounds = computePlanningNBounds(stats);
+      state.planChartBounds = bounds;
+      drawPlanningPowerChart(stats, bounds);
+      drawPlanningMdeChart(stats, bounds);
+    }
+
+    function setPlanningHoverFromCanvas(canvas, key, event) {
+      if (state.calculatorMode !== CALC_MODE_PLANNING) return;
+      if (!state.planChartBounds) return;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+      const nextN = state.planChartBounds.nMin + ratio * (state.planChartBounds.nMax - state.planChartBounds.nMin);
+      state[key] = nextN;
+      update();
+    }
+
+    function clearPlanningHover(key) {
+      if (!Number.isFinite(state[key])) return;
+      state[key] = null;
+      if (state.calculatorMode === CALC_MODE_PLANNING) update();
     }
 
     function drawAxes(ctx, width, height, xMin, xMax, valueFormatter) {
@@ -704,6 +1366,22 @@
       ctx.strokeStyle = strokeStyle;
       ctx.lineWidth = lineWidth;
       ctx.stroke();
+    }
+
+    function fillCurveBetween(ctx, points, axis, yToPx, xStart, xEnd, fillStyle) {
+      if (!points.length) return;
+      const minX = points[0].x;
+      const maxX = points[points.length - 1].x;
+      const left = clamp(Math.min(xStart, xEnd), minX, maxX);
+      const right = clamp(Math.max(xStart, xEnd), minX, maxX);
+      if (!(right > left)) return;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(axis.xToPx(left), axis.m.top, axis.xToPx(right) - axis.xToPx(left), axis.plotH);
+      ctx.clip();
+      drawFilledCurve(ctx, points, axis.xToPx, yToPx, axis.baselineY, fillStyle);
+      ctx.restore();
     }
 
     function resizeCanvas(canvas) {
@@ -925,24 +1603,8 @@
       const zCriticalLeft = -stats.z;
       const zCriticalRight = stats.z;
 
-      if (zCriticalLeft > xMin) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(axis.xToPx(xMin), axis.m.top, axis.xToPx(zCriticalLeft) - axis.xToPx(xMin), axis.plotH);
-        ctx.clip();
-        drawFilledCurve(ctx, points, axis.xToPx, yToPx, axis.baselineY, "rgba(196, 70, 47, 0.2)");
-        ctx.restore();
-      }
-
-      if (zCriticalRight < xMax) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(axis.xToPx(zCriticalRight), axis.m.top, axis.xToPx(xMax) - axis.xToPx(zCriticalRight), axis.plotH);
-        ctx.clip();
-        drawFilledCurve(ctx, points, axis.xToPx, yToPx, axis.baselineY, "rgba(196, 70, 47, 0.2)");
-        ctx.restore();
-      }
-
+      fillCurveBetween(ctx, points, axis, yToPx, xMin, zCriticalLeft, "rgba(196, 70, 47, 0.2)");
+      fillCurveBetween(ctx, points, axis, yToPx, zCriticalRight, xMax, "rgba(196, 70, 47, 0.2)");
       drawCurveLine(ctx, points, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--d"));
 
       ctx.setLineDash([4, 4]);
@@ -968,7 +1630,6 @@
       const observedX = Number.isFinite(stats.zScore)
         ? clamp(stats.zScore, xMin, xMax)
         : (stats.zScore >= 0 ? xMax : xMin);
-
       ctx.setLineDash([]);
       ctx.lineWidth = 1.8;
       ctx.strokeStyle = "rgba(15, 95, 82, 0.82)";
@@ -1022,7 +1683,7 @@
         ui.hypothesis.classList.remove("bad");
         ui.hypothesis.classList.add("ok");
         if (state.mode === MODE_Z_TEST) {
-          ui.hypothesisText.textContent = `p-value = ${fmtPValue(stats.pValue)} < alpha = ${stats.alpha.toFixed(4)}. Изменение статистически значимо.`;
+          ui.hypothesisText.textContent = `p-value = ${fmtPValue(stats.pValue)} < alpha = ${stats.alpha.toFixed(4)}. Разница статистически значима.`;
         } else {
           ui.hypothesisText.textContent = "0 не попадает в CI разницы. Изменение статистически значимо.";
         }
@@ -1031,7 +1692,7 @@
         ui.hypothesis.classList.remove("ok");
         ui.hypothesis.classList.add("bad");
         if (state.mode === MODE_Z_TEST) {
-          ui.hypothesisText.textContent = `p-value = ${fmtPValue(stats.pValue)} >= alpha = ${stats.alpha.toFixed(4)}. Статзначимость не подтверждена.`;
+          ui.hypothesisText.textContent = `p-value = ${fmtPValue(stats.pValue)} >= alpha = ${stats.alpha.toFixed(4)}. Статистическая значимость не подтверждена.`;
         } else {
           ui.hypothesisText.textContent = "0 попадает в CI разницы. Статзначимость не подтверждена.";
         }
@@ -1072,6 +1733,14 @@
     }
 
     function update() {
+      syncCalculatorMode();
+      if (state.calculatorMode === CALC_MODE_PLANNING) {
+        syncPlannerInputControls();
+        const planningStats = computePlanningStats();
+        renderPlanningStats(planningStats);
+        drawPlanningCharts(planningStats);
+        return;
+      }
       const stats = computeStats();
       renderStats(stats);
       drawConversionChart(stats);
@@ -1082,6 +1751,10 @@
     setupLinkedControl({ rangeEl: ui.n1Range, numberEl: ui.n1Number, key: "n1", integer: true });
     setupLinkedControl({ rangeEl: ui.p2Range, numberEl: ui.p2Number, key: "p2" });
     setupLinkedControl({ rangeEl: ui.n2Range, numberEl: ui.n2Number, key: "n2", integer: true });
+    setupLinkedControl({ rangeEl: ui.planBaseRateRange, numberEl: ui.planBaseRateNumber, key: "planBaseRate" });
+    setupLinkedControl({ rangeEl: ui.planPowerRange, numberEl: ui.planPowerNumber, key: "planTargetPower" });
+    setupLinkedControl({ rangeEl: ui.planNRange, numberEl: ui.planNNumber, key: "planN", integer: true });
+    setupLinkedControl({ rangeEl: ui.planMdeRange, numberEl: ui.planMdeNumber, key: "planMde" });
 
     ui.confidence.addEventListener("input", (event) => {
       const value = Number(event.target.value);
@@ -1103,7 +1776,49 @@
       update();
     });
 
+    const modeButtons = [ui.modeBtnAnalysis, ui.modeBtnPlanning];
+    for (const button of modeButtons) {
+      button.addEventListener("click", () => {
+        state.calculatorMode = button.dataset.mode === CALC_MODE_PLANNING
+          ? CALC_MODE_PLANNING
+          : CALC_MODE_ANALYSIS;
+        update();
+      });
+    }
+
+    ui.planPowerChart.addEventListener("mousemove", (event) => {
+      setPlanningHoverFromCanvas(ui.planPowerChart, "planPowerHoverN", event);
+    });
+    ui.planPowerChart.addEventListener("mouseleave", () => {
+      clearPlanningHover("planPowerHoverN");
+    });
+
+    ui.planMdeChart.addEventListener("mousemove", (event) => {
+      setPlanningHoverFromCanvas(ui.planMdeChart, "planMdeHoverN", event);
+    });
+    ui.planMdeChart.addEventListener("mouseleave", () => {
+      clearPlanningHover("planMdeHoverN");
+    });
+
+    ui.planAlpha.addEventListener("input", (event) => {
+      setPlanAlpha(Number(event.target.value));
+      update();
+    });
+
+    ui.plannerMode.addEventListener("input", (event) => {
+      state.plannerMode = event.target.value === PLAN_MODE_N_FROM_MDE
+        ? PLAN_MODE_N_FROM_MDE
+        : PLAN_MODE_MDE_FROM_N;
+      update();
+    });
+
+    state.calculatorMode = CALC_MODE_ANALYSIS;
     state.mode = ui.inferenceMode.value === MODE_Z_TEST ? MODE_Z_TEST : MODE_CI;
+    state.plannerMode = ui.plannerMode.value === PLAN_MODE_N_FROM_MDE
+      ? PLAN_MODE_N_FROM_MDE
+      : PLAN_MODE_MDE_FROM_N;
+    setPlanAlpha(Number(ui.planAlpha.value));
+    syncPlannerInputControls();
     if (state.mode === MODE_Z_TEST) {
       setAlpha(state.alpha);
     } else {
