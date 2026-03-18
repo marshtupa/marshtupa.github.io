@@ -402,6 +402,7 @@
       }
     }
   </style>
+  <script src="js/ab-planning-core.js"></script>
   <script>
     window.MathJax = {
       tex: { inlineMath: [["\\(", "\\)"], ["$", "$"]] },
@@ -674,12 +675,15 @@
     const Z_VISUAL_POWER = "power";
     const CALC_MODE_ANALYSIS = "analysis";
     const CALC_MODE_PLANNING = "planning";
-    const PLAN_MODE_MDE_FROM_N = "mde_from_n";
-    const PLAN_MODE_N_FROM_MDE = "n_from_mde";
-    const PLAN_DIR_TWO_SIDED = "two_sided";
-    const PLAN_DIR_B_GT_A = "b_gt_a";
-    const PLAN_DIR_B_LT_A = "b_lt_a";
-    const MAX_SOLVER_N = 2000000000;
+    const planningCore = window.AbPlanningCore;
+    if (!planningCore) {
+      throw new Error("Не удалось загрузить модуль планирования AbPlanningCore.");
+    }
+    const PLAN_MODE_MDE_FROM_N = planningCore.PLAN_MODE_MDE_FROM_N;
+    const PLAN_MODE_N_FROM_MDE = planningCore.PLAN_MODE_N_FROM_MDE;
+    const PLAN_DIR_TWO_SIDED = planningCore.PLAN_DIR_TWO_SIDED;
+    const PLAN_DIR_B_GT_A = planningCore.PLAN_DIR_B_GT_A;
+    const PLAN_DIR_B_LT_A = planningCore.PLAN_DIR_B_LT_A;
 
     const state = {
       calculatorMode: CALC_MODE_ANALYSIS,
@@ -860,55 +864,11 @@
     }
 
     function solveMdeFromBaseRate(baseRate, nA, nB, targetPower, zCritical, direction) {
-      if (![baseRate, nA, nB, targetPower, zCritical, direction].every(Number.isFinite)) return Infinity;
-      const clippedTarget = clamp(targetPower, 0, 0.999999);
-      const dir = direction >= 0 ? 1 : -1;
-      const maxEffect = dir > 0 ? 1 - baseRate : baseRate;
-      if (maxEffect <= 0) return Infinity;
-
-      const maxPower = powerForRates(baseRate, baseRate + dir * maxEffect, nA, nB, zCritical);
-      if (maxPower < clippedTarget) return Infinity;
-
-      let lo = 0;
-      let hi = maxEffect;
-      for (let i = 0; i < 60; i++) {
-        const mid = (lo + hi) / 2;
-        const candidatePower = powerForRates(baseRate, baseRate + dir * mid, nA, nB, zCritical);
-        if (candidatePower < clippedTarget) lo = mid;
-        else hi = mid;
-      }
-      return hi;
+      return planningCore.solveMdeFromBaseRate(baseRate, nA, nB, targetPower, zCritical, direction);
     }
 
     function solveNForMde(baseRate, mdeAbs, targetPower, zCritical, direction) {
-      if (![baseRate, mdeAbs, targetPower, zCritical, direction].every(Number.isFinite)) return Infinity;
-      const clippedTarget = clamp(targetPower, 0, 0.999999);
-      const effect = Math.abs(mdeAbs);
-      if (effect <= 0) return 2;
-
-      const dir = direction >= 0 ? 1 : -1;
-      const candidateRate = baseRate + dir * effect;
-      if (candidateRate < 0 || candidateRate > 1) return Infinity;
-
-      const hasEnoughPower = (n) => powerForRates(baseRate, candidateRate, n, n, zCritical) >= clippedTarget;
-
-      let lo = 2;
-      let hi = 2;
-      if (hasEnoughPower(hi)) return hi;
-
-      while (!hasEnoughPower(hi) && hi < MAX_SOLVER_N) {
-        lo = hi;
-        hi = Math.min(MAX_SOLVER_N, hi * 2);
-      }
-
-      if (!hasEnoughPower(hi)) return Infinity;
-
-      while (hi - lo > 1) {
-        const mid = Math.floor((lo + hi) / 2);
-        if (hasEnoughPower(mid)) hi = mid;
-        else lo = mid;
-      }
-      return hi;
+      return planningCore.solveNForMde(baseRate, mdeAbs, targetPower, zCritical, direction);
     }
 
     function fmtPct(value, digits = 3) {
@@ -1011,34 +971,11 @@
     }
 
     function normalizePlanDirectionMode(raw) {
-      if (raw === PLAN_DIR_B_LT_A) return PLAN_DIR_B_LT_A;
-      if (raw === PLAN_DIR_TWO_SIDED) return PLAN_DIR_TWO_SIDED;
-      return PLAN_DIR_B_GT_A;
+      return planningCore.normalizePlanDirectionMode(raw);
     }
 
     function getDirectionModeMeta(mode) {
-      if (mode === PLAN_DIR_B_LT_A) {
-        return {
-          label: "B < A",
-          description: "односторонний B < A",
-          dir: -1,
-          twoSided: false,
-        };
-      }
-      if (mode === PLAN_DIR_TWO_SIDED) {
-        return {
-          label: "двусторонний",
-          description: "двусторонний (консервативно)",
-          dir: 0,
-          twoSided: true,
-        };
-      }
-      return {
-        label: "B > A",
-        description: "односторонний B > A",
-        dir: 1,
-        twoSided: false,
-      };
+      return planningCore.getDirectionModeMeta(mode);
     }
 
     function syncSignificanceControl() {
@@ -1244,107 +1181,7 @@
     }
 
     function computePlanningStats() {
-      const mode = state.plannerMode === PLAN_MODE_N_FROM_MDE
-        ? PLAN_MODE_N_FROM_MDE
-        : PLAN_MODE_MDE_FROM_N;
-      const directionMode = normalizePlanDirectionMode(state.planDirectionMode);
-      const directionMeta = getDirectionModeMeta(directionMode);
-      const baseRate = clamp(state.planBaseRate / 100, 0, 1);
-      const alpha = state.planAlpha;
-      const targetPower = clamp(state.planTargetPower / 100, 0.5, 0.9999);
-      const confidence = Math.round((1 - alpha) * 100);
-      const z = Z_BY_CONF[confidence] || Z_BY_CONF[95];
-
-      const common = {
-        mode,
-        baseRate,
-        alpha,
-        confidence,
-        targetPower,
-        z,
-        directionMode,
-        directionLabel: directionMeta.label,
-        directionDescription: directionMeta.description,
-      };
-
-      if (mode === PLAN_MODE_MDE_FROM_N) {
-        const nPerGroup = Math.max(2, Math.round(state.planN));
-        const mdeUp = solveMdeFromBaseRate(baseRate, nPerGroup, nPerGroup, targetPower, z, 1);
-        const mdeDown = solveMdeFromBaseRate(baseRate, nPerGroup, nPerGroup, targetPower, z, -1);
-        const finiteMde = [mdeUp, mdeDown].filter(Number.isFinite);
-        const conservativeMde = finiteMde.length > 0 ? Math.max(...finiteMde) : Infinity;
-        const hardestDirection = Number.isFinite(mdeUp) && Number.isFinite(mdeDown)
-          ? (mdeUp >= mdeDown ? 1 : -1)
-          : (Number.isFinite(mdeUp) ? 1 : (Number.isFinite(mdeDown) ? -1 : 0));
-        let selectedMde = conservativeMde;
-        let selectedDirection = hardestDirection;
-        if (!directionMeta.twoSided) {
-          if (directionMeta.dir > 0) {
-            selectedMde = mdeUp;
-            selectedDirection = 1;
-          } else {
-            selectedMde = mdeDown;
-            selectedDirection = -1;
-          }
-        }
-
-        return {
-          ...common,
-          nPerGroup,
-          mdeUp,
-          mdeDown,
-          conservativeMde,
-          selectedMde,
-          selectedDirection,
-          hardestDirection,
-          directionFeasible: Number.isFinite(selectedMde),
-          upRate: Number.isFinite(mdeUp) ? baseRate + mdeUp : null,
-          downRate: Number.isFinite(mdeDown) ? baseRate - mdeDown : null,
-          selectedRate: Number.isFinite(selectedMde) && selectedDirection !== 0
-            ? baseRate + selectedDirection * selectedMde
-            : null,
-        };
-      }
-
-      const mdeAbs = Math.abs(state.planMde) / 100;
-      const upFeasible = baseRate + mdeAbs <= 1;
-      const downFeasible = baseRate - mdeAbs >= 0;
-      const nUp = upFeasible ? solveNForMde(baseRate, mdeAbs, targetPower, z, 1) : Infinity;
-      const nDown = downFeasible ? solveNForMde(baseRate, mdeAbs, targetPower, z, -1) : Infinity;
-      const finiteN = [nUp, nDown].filter(Number.isFinite);
-      const conservativeRequiredN = finiteN.length > 0 ? Math.max(...finiteN) : Infinity;
-      const hardestDirection = Number.isFinite(nUp) && Number.isFinite(nDown)
-        ? (nUp >= nDown ? 1 : -1)
-        : (Number.isFinite(nUp) ? 1 : (Number.isFinite(nDown) ? -1 : 0));
-      let selectedN = conservativeRequiredN;
-      let selectedDirection = hardestDirection;
-      if (!directionMeta.twoSided) {
-        if (directionMeta.dir > 0) {
-          selectedN = nUp;
-          selectedDirection = 1;
-        } else {
-          selectedN = nDown;
-          selectedDirection = -1;
-        }
-      }
-      const requiredN = selectedN;
-      const totalN = Number.isFinite(selectedN) ? selectedN * 2 : Infinity;
-
-      return {
-        ...common,
-        mdeAbs,
-        upFeasible,
-        downFeasible,
-        nUp,
-        nDown,
-        selectedN,
-        selectedDirection,
-        requiredN,
-        conservativeRequiredN,
-        totalN,
-        hardestDirection,
-        directionFeasible: Number.isFinite(selectedN),
-      };
+      return planningCore.computePlanningStats(state);
     }
 
     function renderPlanningStats(stats) {
