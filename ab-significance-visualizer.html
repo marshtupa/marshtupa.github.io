@@ -18,6 +18,7 @@
       --b-soft: rgba(221, 122, 47, 0.24);
       --d: #0f5f52;
       --d-soft: rgba(15, 95, 82, 0.25);
+      --h1: #2d6ea2;
       --danger: #c4462f;
       --ok: #0e755b;
       --shadow: 0 20px 55px rgba(17, 35, 38, 0.14);
@@ -218,10 +219,45 @@
       gap: 8px;
     }
 
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
     .panel h2 {
       margin: 0;
       font-size: 1.02rem;
       letter-spacing: 0.02em;
+    }
+
+    .panel-mode-control {
+      display: grid;
+      gap: 4px;
+      justify-items: end;
+      align-content: start;
+    }
+
+    .panel-mode-control[hidden] {
+      display: none !important;
+    }
+
+    .panel-mode-control label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .panel-mode-control select {
+      min-width: 220px;
+      border: 1px solid rgba(18, 32, 40, 0.2);
+      border-radius: 10px;
+      padding: 6px 9px;
+      font: inherit;
+      color: var(--text);
+      background: #fff;
     }
 
     .legend {
@@ -244,6 +280,7 @@
     .dot.a { background: var(--a); }
     .dot.b { background: var(--b); }
     .dot.d { background: var(--d); }
+    .dot.h1 { background: var(--h1); }
     .dot.zero { background: var(--danger); }
 
     canvas {
@@ -309,6 +346,20 @@
 
       .control .row {
         grid-template-columns: 1fr;
+      }
+
+      .panel-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .panel-mode-control {
+        justify-items: stretch;
+      }
+
+      .panel-mode-control select {
+        min-width: 0;
+        width: 100%;
       }
     }
   </style>
@@ -428,7 +479,16 @@
     </section>
 
     <section class="panel analysis-only">
-      <h2 id="differenceTitle">Распределение разницы (A - B)</h2>
+      <div class="panel-head">
+        <h2 id="differenceTitle">Распределение разницы (A - B)</h2>
+        <div id="zVisualControl" class="panel-mode-control" hidden>
+          <label for="zVisualMode">Вид Z-графика</label>
+          <select id="zVisualMode">
+            <option value="h0" selected>Только H0 (критерий)</option>
+            <option value="power">H0 + H1 (мощность)</option>
+          </select>
+        </div>
+      </div>
       <div class="legend">
         <span><span id="differenceLegendPrimaryDot" class="dot d"></span><span id="differenceLegendPrimary">кривая разницы + 95% CI</span></span>
         <span><span id="differenceLegendSecondaryDot" class="dot zero"></span><span id="differenceLegendSecondary">линия нуля</span></span>
@@ -544,6 +604,8 @@
     const ALPHA_LEVELS = [0.1, 0.05, 0.01];
     const MODE_CI = "ci";
     const MODE_Z_TEST = "ztest";
+    const Z_VISUAL_H0 = "h0";
+    const Z_VISUAL_POWER = "power";
     const CALC_MODE_ANALYSIS = "analysis";
     const CALC_MODE_PLANNING = "planning";
     const PLAN_MODE_MDE_FROM_N = "mde_from_n";
@@ -559,6 +621,7 @@
       confidence: 95,
       alpha: 0.05,
       mode: MODE_CI,
+      zVisualMode: Z_VISUAL_H0,
       planBaseRate: 5,
       planAlpha: 0.05,
       planTargetPower: 80,
@@ -585,6 +648,8 @@
       confidenceLabel: document.querySelector('label[for="confidence"]'),
       confidence: document.getElementById("confidence"),
       inferenceMode: document.getElementById("inferenceMode"),
+      zVisualControl: document.getElementById("zVisualControl"),
+      zVisualMode: document.getElementById("zVisualMode"),
       meanA: document.getElementById("meanA"),
       ciA: document.getElementById("ciA"),
       sampleA: document.getElementById("sampleA"),
@@ -671,6 +736,21 @@
       return clamp((1 - normalCdf(zCritical - delta)) + normalCdf(-zCritical - delta), 0, 1);
     }
 
+    function zDecisionAreas(shift, zCritical) {
+      if (!Number.isFinite(shift) || !Number.isFinite(zCritical)) {
+        return { left: 0, right: 0, power: 0, beta: 1 };
+      }
+      const left = clamp(normalCdf(-zCritical - shift), 0, 1);
+      const right = clamp(1 - normalCdf(zCritical - shift), 0, 1);
+      const power = clamp(left + right, 0, 1);
+      return {
+        left,
+        right,
+        power,
+        beta: clamp(1 - power, 0, 1),
+      };
+    }
+
     function seDiffForRates(pA, pB, nA, nB) {
       return Math.sqrt(Math.max((pA * (1 - pA)) / nA + (pB * (1 - pB)) / nB, 0));
     }
@@ -681,6 +761,20 @@
       if (seDiff > 0) return twoSidedPower(diffAbs / seDiff, zCritical);
       if (diffAbs > Number.EPSILON) return 1;
       return 0;
+    }
+
+    function solveDeltaForPower(targetPower, zCritical) {
+      if (!Number.isFinite(targetPower) || !Number.isFinite(zCritical)) return 0;
+      const clippedTarget = clamp(targetPower, 0, 0.999999);
+      let lo = 0;
+      let hi = 1;
+      while (twoSidedPower(hi, zCritical) < clippedTarget && hi < 100) hi *= 2;
+      for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        if (twoSidedPower(mid, zCritical) < clippedTarget) lo = mid;
+        else hi = mid;
+      }
+      return hi;
     }
 
     function solveMdeFromBaseRate(baseRate, nA, nB, targetPower, zCritical, direction) {
@@ -853,17 +947,38 @@
         : "Уровень доверия";
     }
 
+    function syncZVisualControl() {
+      const isZMode = state.mode === MODE_Z_TEST;
+      ui.zVisualControl.hidden = !isZMode;
+      ui.zVisualMode.disabled = !isZMode;
+      if (!isZMode) {
+        state.zVisualMode = Z_VISUAL_H0;
+        ui.zVisualMode.value = Z_VISUAL_H0;
+        return;
+      }
+      state.zVisualMode = ui.zVisualMode.value === Z_VISUAL_POWER ? Z_VISUAL_POWER : Z_VISUAL_H0;
+      ui.zVisualMode.value = state.zVisualMode;
+    }
+
     function renderModeTexts() {
       const confLabel = `${state.confidence}%`;
       ui.convLegendAText.textContent = `кривая A + ${confLabel} CI`;
       ui.convLegendBText.textContent = `кривая B + ${confLabel} CI`;
 
       if (state.mode === MODE_Z_TEST) {
-        ui.differenceTitle.textContent = "Z-распределение для проверки H0";
-        ui.differenceLegendPrimary.textContent = "N(0,1) + критические области";
-        ui.differenceLegendSecondary.textContent = "границы ±z* и наблюдаемое z";
-        ui.differenceLegendPrimaryDot.className = "dot d";
-        ui.differenceLegendSecondaryDot.className = "dot zero";
+        if (state.zVisualMode === Z_VISUAL_POWER) {
+          ui.differenceTitle.textContent = "Z-распределения H0 и H1 (мощность)";
+          ui.differenceLegendPrimary.textContent = "H0: N(0,1) + alpha-области";
+          ui.differenceLegendSecondary.textContent = "H1: N(δ,1), beta и мощность";
+          ui.differenceLegendPrimaryDot.className = "dot d";
+          ui.differenceLegendSecondaryDot.className = "dot h1";
+        } else {
+          ui.differenceTitle.textContent = "Z-распределение для проверки H0";
+          ui.differenceLegendPrimary.textContent = "N(0,1) + критические области";
+          ui.differenceLegendSecondary.textContent = "границы ±z* и наблюдаемое z";
+          ui.differenceLegendPrimaryDot.className = "dot d";
+          ui.differenceLegendSecondaryDot.className = "dot zero";
+        }
       } else {
         ui.differenceTitle.textContent = "Распределение разницы (A - B)";
         ui.differenceLegendPrimary.textContent = `кривая разницы + ${confLabel} CI`;
@@ -941,6 +1056,36 @@
       const significantCI = ciDiff[0] > 0 || ciDiff[1] < 0;
       const significantZTest = pValue < alpha;
       const significant = state.mode === MODE_Z_TEST ? significantZTest : significantCI;
+      const power = powerForRates(pA, pB, nA, nB, z);
+      const targetPower = 0.8;
+      const deltaFor80Power = solveDeltaForPower(targetPower, z);
+      const observedDelta = seDiff > 0 ? Math.abs(diff) / seDiff : (Math.abs(diff) > Number.EPSILON ? Infinity : 0);
+      let h1Shift = zScore;
+      if (!Number.isFinite(h1Shift) && Math.abs(diff) <= Number.EPSILON) h1Shift = 0;
+      const h1Areas = Number.isFinite(h1Shift)
+        ? zDecisionAreas(h1Shift, z)
+        : (h1Shift > 0
+          ? { left: 0, right: 1, power: 1, beta: 0 }
+          : { left: 1, right: 0, power: 1, beta: 0 });
+      const h1ShiftForChart = Number.isFinite(h1Shift)
+        ? h1Shift
+        : (h1Shift >= 0 ? z + 3.5 : -z - 3.5);
+      let sampleScaleFor80Power = 1;
+      let nAFor80Power = nA;
+      let nBFor80Power = nB;
+      const mdeUp = solveMdeFromBaseRate(pA, nA, nB, targetPower, z, 1);
+      const mdeDown = solveMdeFromBaseRate(pA, nA, nB, targetPower, z, -1);
+      const finiteMde = [mdeUp, mdeDown].filter(Number.isFinite);
+      const diffFor80Power = finiteMde.length > 0 ? Math.max(...finiteMde) : Infinity;
+      if (observedDelta > Number.EPSILON && Number.isFinite(observedDelta)) {
+        sampleScaleFor80Power = Math.max(1, (deltaFor80Power / observedDelta) ** 2);
+        nAFor80Power = Math.ceil(nA * sampleScaleFor80Power);
+        nBFor80Power = Math.ceil(nB * sampleScaleFor80Power);
+      } else {
+        sampleScaleFor80Power = Infinity;
+        nAFor80Power = null;
+        nBFor80Power = null;
+      }
 
       return {
         z,
@@ -959,6 +1104,21 @@
         ciDiff,
         zScore,
         pValue,
+        power,
+        alphaLeft: normalCdf(-z),
+        alphaRight: 1 - normalCdf(z),
+        targetPower,
+        deltaFor80Power,
+        h1Shift,
+        h1ShiftForChart,
+        h1Power: h1Areas.power,
+        h1Beta: h1Areas.beta,
+        h1PowerLeft: h1Areas.left,
+        h1PowerRight: h1Areas.right,
+        sampleScaleFor80Power,
+        nAFor80Power,
+        nBFor80Power,
+        diffFor80Power,
         significantCI,
         significantZTest,
         significant,
@@ -1572,20 +1732,32 @@
       const { ctx, width, height } = resizeCanvas(ui.differenceChart);
       ctx.clearRect(0, 0, width, height);
 
+      const withPowerOverlay = state.zVisualMode === Z_VISUAL_POWER;
       const observedAbs = Number.isFinite(stats.zScore) ? Math.abs(stats.zScore) : stats.z + 1.5;
-      const edge = clamp(Math.max(4, stats.z + 1.2, observedAbs + 0.9), 4, 12);
+      const shiftAbs = Math.abs(stats.h1ShiftForChart);
+      const edge = clamp(
+        Math.max(4, stats.z + 1.2, observedAbs + 0.9, withPowerOverlay ? shiftAbs + 3.2 : 0),
+        4,
+        14
+      );
       const xMin = -edge;
       const xMax = edge;
 
       const sampleCount = 420;
-      const points = [];
+      const pointsH0 = [];
+      const pointsH1 = [];
       let yMax = 0;
 
       for (let i = 0; i <= sampleCount; i++) {
         const x = xMin + (i / sampleCount) * (xMax - xMin);
-        const y = normalPdf(x, 0, 1);
-        points.push({ x, y });
-        yMax = Math.max(yMax, y);
+        const yH0 = normalPdf(x, 0, 1);
+        pointsH0.push({ x, y: yH0 });
+        yMax = Math.max(yMax, yH0);
+        if (withPowerOverlay) {
+          const yH1 = normalPdf(x, stats.h1ShiftForChart, 1);
+          pointsH1.push({ x, y: yH1 });
+          yMax = Math.max(yMax, yH1);
+        }
       }
 
       yMax = Math.max(yMax * 1.08, 1);
@@ -1603,9 +1775,20 @@
       const zCriticalLeft = -stats.z;
       const zCriticalRight = stats.z;
 
-      fillCurveBetween(ctx, points, axis, yToPx, xMin, zCriticalLeft, "rgba(196, 70, 47, 0.2)");
-      fillCurveBetween(ctx, points, axis, yToPx, zCriticalRight, xMax, "rgba(196, 70, 47, 0.2)");
-      drawCurveLine(ctx, points, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--d"));
+      const h0TailFill = withPowerOverlay ? "rgba(196, 70, 47, 0.08)" : "rgba(196, 70, 47, 0.16)";
+      fillCurveBetween(ctx, pointsH0, axis, yToPx, xMin, zCriticalLeft, h0TailFill);
+      fillCurveBetween(ctx, pointsH0, axis, yToPx, zCriticalRight, xMax, h0TailFill);
+
+      if (withPowerOverlay) {
+        fillCurveBetween(ctx, pointsH1, axis, yToPx, zCriticalLeft, zCriticalRight, "rgba(209, 146, 52, 0.32)");
+        fillCurveBetween(ctx, pointsH1, axis, yToPx, xMin, zCriticalLeft, "rgba(14, 117, 91, 0.34)");
+        fillCurveBetween(ctx, pointsH1, axis, yToPx, zCriticalRight, xMax, "rgba(14, 117, 91, 0.34)");
+      }
+
+      drawCurveLine(ctx, pointsH0, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--d"));
+      if (withPowerOverlay) {
+        drawCurveLine(ctx, pointsH1, axis.xToPx, yToPx, getComputedStyle(document.documentElement).getPropertyValue("--h1"));
+      }
 
       ctx.setLineDash([4, 4]);
       ctx.lineWidth = 1.2;
@@ -1627,16 +1810,28 @@
       ctx.lineTo(axis.xToPx(zCriticalRight), axis.baselineY);
       ctx.stroke();
 
-      const observedX = Number.isFinite(stats.zScore)
-        ? clamp(stats.zScore, xMin, xMax)
-        : (stats.zScore >= 0 ? xMax : xMin);
       ctx.setLineDash([]);
-      ctx.lineWidth = 1.8;
-      ctx.strokeStyle = "rgba(15, 95, 82, 0.82)";
-      ctx.beginPath();
-      ctx.moveTo(axis.xToPx(observedX), axis.m.top);
-      ctx.lineTo(axis.xToPx(observedX), axis.baselineY);
-      ctx.stroke();
+      if (withPowerOverlay) {
+        const deltaX = clamp(stats.h1ShiftForChart, xMin, xMax);
+        ctx.setLineDash([9, 4]);
+        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = "rgba(45, 110, 162, 0.86)";
+        ctx.beginPath();
+        ctx.moveTo(axis.xToPx(deltaX), axis.m.top);
+        ctx.lineTo(axis.xToPx(deltaX), axis.baselineY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        const observedX = Number.isFinite(stats.zScore)
+          ? clamp(stats.zScore, xMin, xMax)
+          : (stats.zScore >= 0 ? xMax : xMin);
+        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = "rgba(15, 95, 82, 0.82)";
+        ctx.beginPath();
+        ctx.moveTo(axis.xToPx(observedX), axis.m.top);
+        ctx.lineTo(axis.xToPx(observedX), axis.baselineY);
+        ctx.stroke();
+      }
 
       ctx.fillStyle = "rgba(18, 32, 40, 0.7)";
       ctx.font = '12px "Avenir Next", "Trebuchet MS", sans-serif';
@@ -1645,7 +1840,15 @@
       ctx.fillText("Z-статистика", axis.m.left + 2, 5);
 
       ctx.textAlign = "right";
-      ctx.fillText(`z=${fmtZ(stats.zScore)}, p=${fmtPValue(stats.pValue)}`, width - axis.m.right, 5);
+      if (withPowerOverlay) {
+        ctx.fillText(
+          `delta=${fmtZ(stats.h1Shift)}, alpha=${fmtPower(stats.alpha)}, beta=${fmtPower(stats.h1Beta)}, power=${fmtPower(stats.h1Power)}`,
+          width - axis.m.right,
+          5
+        );
+      } else {
+        ctx.fillText(`z=${fmtZ(stats.zScore)}, p=${fmtPValue(stats.pValue)}`, width - axis.m.right, 5);
+      }
     }
 
     function drawDifferenceChart(stats) {
@@ -1658,6 +1861,7 @@
 
     function renderStats(stats) {
       syncSignificanceControl();
+      syncZVisualControl();
       renderModeTexts();
       const confLabel = `${state.confidence}%`;
 
@@ -1683,7 +1887,7 @@
         ui.hypothesis.classList.remove("bad");
         ui.hypothesis.classList.add("ok");
         if (state.mode === MODE_Z_TEST) {
-          ui.hypothesisText.textContent = `p-value = ${fmtPValue(stats.pValue)} < alpha = ${stats.alpha.toFixed(4)}. Разница статистически значима.`;
+          ui.hypothesisText.textContent = `p-value = ${fmtPValue(stats.pValue)} < alpha = ${stats.alpha.toFixed(4)}. Разница статистически значима. Мощность теста для эффекта такого размера ≈ ${fmtPower(stats.power)}: тест обнаруживает эффекты такого масштаба с этой вероятностью.`;
         } else {
           ui.hypothesisText.textContent = "0 не попадает в CI разницы. Изменение статистически значимо.";
         }
@@ -1692,7 +1896,13 @@
         ui.hypothesis.classList.remove("ok");
         ui.hypothesis.classList.add("bad");
         if (state.mode === MODE_Z_TEST) {
-          ui.hypothesisText.textContent = `p-value = ${fmtPValue(stats.pValue)} >= alpha = ${stats.alpha.toFixed(4)}. Статистическая значимость не подтверждена.`;
+          const sampleRecommendation = Number.isFinite(stats.sampleScaleFor80Power) && stats.nAFor80Power && stats.nBFor80Power
+            ? `Чтобы получить мощность ${fmtPower(stats.targetPower)} для эффекта такого размера, увеличьте выборку примерно до ${fmtN(stats.nAFor80Power)} наблюдений в A и ${fmtN(stats.nBFor80Power)} в B.`
+            : `Для практически нулевой наблюдаемой разницы расчёт требуемой выборки под мощность ${fmtPower(stats.targetPower)} некорректен: сначала нужен минимально значимый эффект.`;
+          const effectRecommendation = Number.isFinite(stats.diffFor80Power)
+            ? `Либо при текущих размерах выборок (при фиксированной конверсии A) нужен эффект не меньше ${fmtPpAbs(stats.diffFor80Power)} по модулю разницы конверсий, чтобы мощность была около ${fmtPower(stats.targetPower)}.`
+            : `При текущем размере выборки достичь мощности ${fmtPower(stats.targetPower)} для реалистичного эффекта не удаётся в допустимых границах конверсии.`;
+          ui.hypothesisText.textContent = `p-value = ${fmtPValue(stats.pValue)} >= alpha = ${stats.alpha.toFixed(4)}. Статистическая значимость не подтверждена. Мощность теста для эффекта такого размера ≈ ${fmtPower(stats.power)}: с такой чувствительностью разницу такого масштаба сложно обнаружить. Это может означать либо отсутствие эффекта, либо то, что тест не способен его надёжно обнаружить при текущем объёме выборки. Рекомендация: ${sampleRecommendation} ${effectRecommendation}`;
         } else {
           ui.hypothesisText.textContent = "0 попадает в CI разницы. Статзначимость не подтверждена.";
         }
@@ -1713,6 +1923,10 @@
           `<p>Проверка критерия: \\(|z| ${zCompare} z^*=${stats.z.toFixed(4)}\\), где \\(\\alpha=${stats.alpha.toFixed(4)}\\).</p>`,
           `<p>\\(p\\text{-value}=${fmtPValue(stats.pValue)}\\). ${incompatibilityText}</p>`,
           `<p>\\(1-p\\approx ${confidenceHint}\\) можно использовать только как грубый индикатор силы несовместимости данных с \\(H_0\\), но не как вероятность истинности или ложности \\(H_0\\).</p>`,
+          ...(state.zVisualMode === Z_VISUAL_POWER ? [
+            `<p>Для графика мощности принимаем альтернативу \\(H_1: Z\\sim N(\\delta,1)\\), где \\(\\delta\\approx ${fmtZ(stats.h1Shift)}\\) (оценка по наблюдаемому эффекту).</p>`,
+            `<p>На графике: красные хвосты под \\(H_0\\) дают \\(\\alpha\\approx ${fmtPower(stats.alpha)}\\), жёлтая область под \\(H_1\\) даёт \\(\\beta\\approx ${fmtPower(stats.h1Beta)}\\), зелёные хвосты под \\(H_1\\) дают мощность \\(1-\\beta\\approx ${fmtPower(stats.h1Power)}\\).</p>`,
+          ] : []),
         ].join("");
       } else {
         const zeroInsideCI = stats.ciDiff[0] <= 0 && stats.ciDiff[1] >= 0;
@@ -1776,6 +1990,11 @@
       update();
     });
 
+    ui.zVisualMode.addEventListener("input", (event) => {
+      state.zVisualMode = event.target.value === Z_VISUAL_POWER ? Z_VISUAL_POWER : Z_VISUAL_H0;
+      update();
+    });
+
     const modeButtons = [ui.modeBtnAnalysis, ui.modeBtnPlanning];
     for (const button of modeButtons) {
       button.addEventListener("click", () => {
@@ -1814,6 +2033,7 @@
 
     state.calculatorMode = CALC_MODE_ANALYSIS;
     state.mode = ui.inferenceMode.value === MODE_Z_TEST ? MODE_Z_TEST : MODE_CI;
+    state.zVisualMode = ui.zVisualMode.value === Z_VISUAL_POWER ? Z_VISUAL_POWER : Z_VISUAL_H0;
     state.plannerMode = ui.plannerMode.value === PLAN_MODE_N_FROM_MDE
       ? PLAN_MODE_N_FROM_MDE
       : PLAN_MODE_MDE_FROM_N;
